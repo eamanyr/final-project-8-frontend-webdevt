@@ -25,27 +25,24 @@ export const CourseList = () => {
   } = useLMS();
 
   const [activeTabFilter, setActiveTabFilter] = useState('all');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-
-  const categories = ['all', 'Fine Arts', 'Illustration', 'Typography', 'Computer Science'];
 
   const filteredCourses = courses.filter((course) => {
-    // Tab filter
-    const isEnrolled = currentUser?.enrolledCourseIds?.includes(course.id);
-    if (activeTabFilter === 'enrolled' && !isEnrolled) return false;
-    if (activeTabFilter === 'completed' && course.progress < 100) return false;
-
-    // Category filter
-    if (selectedCategory !== 'all' && course.category !== selectedCategory) return false;
+    // Tab filter (only applies to non-admin roles)
+    if (currentUser?.role !== 'admin') {
+      const isEnrolled = currentUser?.enrolledCourseIds?.includes(course.id);
+      if (activeTabFilter === 'enrolled' && !isEnrolled) return false;
+      if (activeTabFilter === 'completed' && course.progress < 100) return false;
+    }
 
     // Search query filter
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.toLowerCase().trim();
     if (
       query &&
       !course.title.toLowerCase().includes(query) &&
       !course.description.toLowerCase().includes(query) &&
       !course.instructorName.toLowerCase().includes(query) &&
-      !course.code.toLowerCase().includes(query)
+      !course.code.toLowerCase().includes(query) &&
+      !course.category.toLowerCase().includes(query)
     ) {
       return false;
     }
@@ -62,7 +59,7 @@ export const CourseList = () => {
             Curriculum Directory
           </span>
           <h2 className="text-2xl font-bold text-charcoal font-heading">
-            Browse & Enrolled Courses
+            {currentUser?.role === 'admin' ? 'All Courses' : 'Browse & Enrolled Courses'}
           </h2>
           <p className="text-xs text-charcoal-muted mt-0.5">
             Discover accredited studio disciplines, modern frameworks, and craft workshops
@@ -81,57 +78,66 @@ export const CourseList = () => {
         )}
       </div>
 
-      {/* Tabs & Search Filter Controls */}
+      {/* Tabs & Search Bar Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         {/* Navigation Tabs */}
         <div className="flex items-center bg-white rounded-full p-1 border border-charcoal/10 shadow-xs shrink-0 overflow-x-auto">
           <button
             onClick={() => setActiveTabFilter('all')}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              activeTabFilter === 'all'
+              activeTabFilter === 'all' || currentUser?.role === 'admin'
                 ? 'bg-charcoal text-cream shadow-xs font-bold'
                 : 'text-charcoal-muted hover:text-charcoal'
             }`}
           >
-            Explore All ({courses.length})
+            {currentUser?.role === 'admin'
+              ? `All Courses (${courses.length})`
+              : `Explore All (${courses.length})`}
           </button>
-          <button
-            onClick={() => setActiveTabFilter('enrolled')}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              activeTabFilter === 'enrolled'
-                ? 'bg-charcoal text-cream shadow-xs font-bold'
-                : 'text-charcoal-muted hover:text-charcoal'
-            }`}
-          >
-            My Enrolled ({currentUser?.enrolledCourseIds?.length || 0})
-          </button>
-          <button
-            onClick={() => setActiveTabFilter('completed')}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              activeTabFilter === 'completed'
-                ? 'bg-charcoal text-cream shadow-xs font-bold'
-                : 'text-charcoal-muted hover:text-charcoal'
-            }`}
-          >
-            Completed
-          </button>
+          {currentUser?.role !== 'admin' && (
+            <>
+              <button
+                onClick={() => setActiveTabFilter('enrolled')}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  activeTabFilter === 'enrolled'
+                    ? 'bg-charcoal text-cream shadow-xs font-bold'
+                    : 'text-charcoal-muted hover:text-charcoal'
+                }`}
+              >
+                My Enrolled ({currentUser?.enrolledCourseIds?.length || 0})
+              </button>
+              <button
+                onClick={() => setActiveTabFilter('completed')}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  activeTabFilter === 'completed'
+                    ? 'bg-charcoal text-cream shadow-xs font-bold'
+                    : 'text-charcoal-muted hover:text-charcoal'
+                }`}
+              >
+                Completed
+              </button>
+            </>
+          )}
         </div>
 
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
-          {categories.map((cat) => (
+        {/* Search Bar */}
+        <div className="relative w-full lg:w-88">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-charcoal-muted" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search courses, instructors, codes, disciplines..."
+            className="w-full bg-white border border-charcoal/15 rounded-full pl-10 pr-14 py-2 text-xs text-charcoal placeholder:text-charcoal-muted/70 focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest transition-all shadow-xs"
+          />
+          {searchQuery && (
             <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                selectedCategory === cat
-                  ? 'bg-forest text-cream shadow-xs'
-                  : 'bg-white border border-charcoal/10 text-charcoal-muted hover:text-charcoal'
-              }`}
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-charcoal-muted hover:text-charcoal"
             >
-              {cat === 'all' ? 'All Disciplines' : cat}
+              Clear
             </button>
-          ))}
+          )}
         </div>
       </div>
 
@@ -143,7 +149,11 @@ export const CourseList = () => {
           return (
             <div
               key={course.id}
-              className="bg-white rounded-3xl border border-charcoal/10 overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between group"
+              onClick={() => {
+                setSelectedCourseId(course.id);
+                setActiveTab('course-details');
+              }}
+              className="bg-white rounded-3xl border border-charcoal/10 overflow-hidden shadow-xs hover:shadow-lg hover:border-forest/30 transition-all duration-300 flex flex-col justify-between group cursor-pointer"
             >
               <div>
                 {/* Course Image Header */}
@@ -183,13 +193,7 @@ export const CourseList = () => {
 
                 {/* Course Body */}
                 <div className="p-5">
-                  <h3
-                    onClick={() => {
-                      setSelectedCourseId(course.id);
-                      setActiveTab('course-details');
-                    }}
-                    className="text-base font-bold font-heading text-charcoal hover:text-forest transition-colors cursor-pointer line-clamp-1"
-                  >
+                  <h3 className="text-base font-bold font-heading text-charcoal group-hover:text-forest transition-colors line-clamp-1">
                     {course.title}
                   </h3>
 
@@ -245,7 +249,8 @@ export const CourseList = () => {
               {/* Action Footer */}
               <div className="p-5 pt-0 flex items-center gap-2">
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setSelectedCourseId(course.id);
                     setActiveTab('course-details');
                   }}
@@ -256,7 +261,10 @@ export const CourseList = () => {
 
                 {currentUser?.role === 'student' && (
                   <button
-                    onClick={() => toggleEnrollCourse(course.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleEnrollCourse(course.id);
+                    }}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs ${
                       isEnrolled
                         ? 'bg-sage/30 text-forest hover:bg-red-50 hover:text-red-700'

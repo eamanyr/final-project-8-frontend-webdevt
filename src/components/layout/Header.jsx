@@ -1,31 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLMS } from '../../context/LMSContext';
 import {
-  Search,
   Bell,
   Menu,
   PanelRightClose,
   PanelRightOpen,
-  UserCheck,
-  CheckCircle,
-  Clock,
-  Sparkles,
-  RotateCcw
 } from 'lucide-react';
 
 export const Header = () => {
   const {
     currentUser,
-    searchQuery,
-    setSearchQuery,
-    switchDemoUser,
     announcements,
     unreadAnnouncementsCount,
     markAnnouncementAsRead,
+    setSelectedAnnouncementId,
     isRightPanelOpen,
     setIsRightPanelOpen,
     setIsMobileMenuOpen,
-    resetDemoData,
     setActiveTab,
   } = useLMS();
 
@@ -49,7 +40,7 @@ export const Header = () => {
 
   return (
     <header className="sticky top-0 z-30 bg-cream/90 backdrop-blur-md border-b border-charcoal/10 px-4 lg:px-8 py-3.5 transition-all">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4">
         {/* Left: Hamburger + Greeting */}
         <div className="flex items-center gap-3">
           <button
@@ -76,76 +67,8 @@ export const Header = () => {
           </div>
         </div>
 
-        {/* Center: Search Bar */}
-        <div className="flex-1 max-w-md mx-0 md:mx-4">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-charcoal-muted" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for classes, tasks, materials..."
-              className="w-full bg-white border border-charcoal/15 rounded-full pl-10 pr-4 py-2 text-xs text-charcoal placeholder:text-charcoal-muted/70 focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest transition-all shadow-xs"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-charcoal-muted hover:text-charcoal"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Right Actions: Demo Switcher + Notifications + Panel Toggle */}
+        {/* Right Actions: Notifications + Panel Toggle */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Quick Demo Switcher Pills */}
-          <div className="hidden sm:flex items-center bg-white border border-charcoal/10 rounded-full p-1 shadow-xs">
-            <span className="text-[10px] uppercase font-bold text-charcoal-muted px-2">
-              Demo:
-            </span>
-            <button
-              onClick={() => switchDemoUser('student')}
-              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
-                currentUser.role === 'student'
-                  ? 'bg-forest text-cream shadow-xs'
-                  : 'text-charcoal-muted hover:text-charcoal'
-              }`}
-            >
-              Student
-            </button>
-            <button
-              onClick={() => switchDemoUser('teacher')}
-              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
-                currentUser.role === 'teacher'
-                  ? 'bg-forest text-cream shadow-xs'
-                  : 'text-charcoal-muted hover:text-charcoal'
-              }`}
-            >
-              Teacher
-            </button>
-            <button
-              onClick={() => switchDemoUser('admin')}
-              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
-                currentUser.role === 'admin'
-                  ? 'bg-forest text-cream shadow-xs'
-                  : 'text-charcoal-muted hover:text-charcoal'
-              }`}
-            >
-              Admin
-            </button>
-          </div>
-
-          {/* Reset Demo Data button */}
-          <button
-            onClick={resetDemoData}
-            title="Reset to fresh demo data"
-            className="p-2 rounded-full bg-white border border-charcoal/10 text-charcoal-muted hover:text-charcoal hover:bg-gold/15 transition-all shadow-xs"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-
           {/* Notifications Dropdown */}
           <div className="relative" ref={notifRef}>
             <button
@@ -177,6 +100,7 @@ export const Header = () => {
                   </div>
                   <button
                     onClick={() => {
+                      setSelectedAnnouncementId(null);
                       setActiveTab('announcements');
                       setIsNotifOpen(false);
                     }}
@@ -190,8 +114,13 @@ export const Header = () => {
                   {announcements.slice(0, 4).map((anc) => (
                     <div
                       key={anc.id}
-                      onClick={() => markAnnouncementAsRead(anc.id)}
-                      className={`p-3 rounded-xl border text-left cursor-pointer transition-colors ${
+                      onClick={() => {
+                        markAnnouncementAsRead(anc.id);
+                        setSelectedAnnouncementId(anc.id);
+                        setIsNotifOpen(false);
+                        setActiveTab('announcements');
+                      }}
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-colors hover:border-forest/30 ${
                         anc.isRead
                           ? 'bg-cream/40 border-charcoal/10'
                           : 'bg-cream border-gold/40 shadow-xs'

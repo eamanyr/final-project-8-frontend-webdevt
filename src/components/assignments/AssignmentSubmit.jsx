@@ -19,6 +19,7 @@ export const AssignmentSubmit = () => {
     currentUser,
     submitAssignment,
     setActiveTab,
+    assignmentOrigin,
   } = useLMS();
 
   const assignment = assignments.find((a) => a.id === selectedAssignmentId) || assignments[0];
@@ -89,10 +90,16 @@ export const AssignmentSubmit = () => {
 
             <div className="mt-8 flex items-center justify-center gap-3">
               <button
-                onClick={() => setActiveTab('assignments')}
+                onClick={() =>
+                  setActiveTab(
+                    assignmentOrigin === 'course-details' ? 'course-details' : 'todo'
+                  )
+                }
                 className="px-5 py-2.5 rounded-xl border border-charcoal/20 text-xs font-bold text-charcoal hover:bg-cream"
               >
-                Back to Assignments
+                {assignmentOrigin === 'course-details'
+                  ? 'Back to Course Details'
+                  : 'Back to To-Do'}
               </button>
               <button
                 onClick={() => setActiveTab('grades')}

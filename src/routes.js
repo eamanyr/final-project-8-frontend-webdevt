@@ -7,14 +7,18 @@ export const TAB_PATHS = {
   register: '/register',
 
   dashboard: '/dashboard',
+  teacher: '/teacher',
+  admin: '/admin',
 
   courses: '/courses',
   'course-details': '/course-details',
+  'course-lesson': '/course-lesson',
   'create-course': '/courses/new',
 
   materials: '/materials',
 
-  assignments: '/assignments',
+  todo: '/todo',
+  assignments: '/todo',
   'assignment-details': '/assignments/details',
   'create-assignment': '/assignments/new',
   'assignment-submit': '/assignments/submit',
@@ -28,6 +32,7 @@ export const TAB_PATHS = {
 
   announcements: '/announcements',
   profile: '/profile',
+  schedule: '/schedule',
   settings: '/settings',
 };
 

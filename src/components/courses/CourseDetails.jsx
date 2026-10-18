@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLMS } from '../../context/LMSContext';
+import { buildCourseUnitsWithItems } from '../../data/courseCurriculum';
 import {
   ArrowLeft,
   Users,
@@ -13,7 +14,13 @@ import {
   Share2,
   Edit,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  Check,
+  Lock,
+  Paperclip,
+  Rocket,
+  Circle,
 } from 'lucide-react';
 
 export const CourseDetails = () => {
@@ -24,21 +31,60 @@ export const CourseDetails = () => {
     users,
     materials,
     assignments,
+    submissions,
+    viewedLessonIds,
+    markLessonAsViewed,
+    setSelectedLessonId,
     setActiveTab,
     toggleEnrollCourse,
     setSelectedAssignmentId,
+    setAssignmentOrigin,
+    addToast,
   } = useLMS();
 
   const [activeTab, setActiveSection] = useState('syllabus');
+  const [openUnits, setOpenUnits] = useState({ 0: true, 1: true, 2: true });
 
   const course = courses.find((c) => c.id === selectedCourseId) || courses[0];
   if (!course) return null;
 
   const isEnrolled = currentUser?.enrolledCourseIds?.includes(course.id);
+  const isStudent = currentUser?.role === 'student';
 
   // Filter materials & assignments for this course
   const courseMaterials = materials.filter((m) => m.courseId === course.id);
   const courseAssignments = assignments.filter((a) => a.courseId === course.id);
+
+  const unitsWithItems = buildCourseUnitsWithItems(
+    course,
+    courseAssignments,
+    courseMaterials
+  );
+
+  const toggleUnitDropdown = (unitIdx) => {
+    setOpenUnits((prev) => ({ ...prev, [unitIdx]: !prev[unitIdx] }));
+  };
+
+  const isAssignmentDone = (asg) => {
+    if (!asg) return true;
+    const submitted = (submissions || []).some(
+      (s) => s.assignmentId === asg.id && s.studentId === currentUser?.id
+    );
+    return submitted || asg.status === 'Graded';
+  };
+
+  const isUnitCompleted = (unit) => {
+    const allLessonsViewed = unit.lessons.every((l) =>
+      viewedLessonIds.includes(l.id)
+    );
+    const allTasksDone = unit.assignments.every((a) => isAssignmentDone(a));
+    return allLessonsViewed && allTasksDone;
+  };
+
+  const isUnitUnlocked = (unitIdx) => {
+    if (!isStudent || unitIdx === 0) return true;
+    return isUnitCompleted(unitsWithItems[unitIdx - 1]);
+  };
 
   // Enrolled students list
   const enrolledStudents = users.filter(
@@ -70,10 +116,13 @@ export const CourseDetails = () => {
 
       {/* Course Hero Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-white border border-charcoal/10 shadow-xs">
-        <div className="h-48 sm:h-64 relative">
+        <div className="h-48 sm:h-64 relative bg-gradient-to-r from-forest via-forest-light to-sage">
           <img
             src={course.thumbnail}
-            alt={course.title}
+            alt=""
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
@@ -196,33 +245,235 @@ export const CourseDetails = () => {
           </div>
 
           <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
-            <h3 className="text-base font-bold font-heading text-charcoal mb-4">
-              Curriculum Units & Lessons
-            </h3>
-            <div className="space-y-3">
-              {course.syllabus?.map((unit, idx) => (
-                <div
-                  key={idx}
-                  className="p-4 rounded-2xl border border-charcoal/10 bg-cream/30 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-forest/10 text-forest flex items-center justify-center font-bold text-xs">
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-forest uppercase tracking-wider">
-                        {unit.unit}
-                      </span>
-                      <h4 className="text-xs sm:text-sm font-bold text-charcoal">
-                        {unit.title}
-                      </h4>
-                    </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+              <div>
+                <h3 className="text-base font-bold font-heading text-charcoal">
+                  Curriculum Units &amp; Lessons
+                </h3>
+                <p className="text-xs text-charcoal-muted mt-0.5">
+                  Click a unit to expand its lessons and required tasks. Complete all items in a unit to unlock the next unit.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5">
+              {unitsWithItems.map((unit, idx) => {
+                const isOpen = !!openUnits[idx];
+                const unitUnlocked = isUnitUnlocked(idx);
+                const unitDone = isUnitCompleted(unit);
+                const allLessonsInUnitViewed = unit.lessons.every((l) =>
+                  viewedLessonIds.includes(l.id)
+                );
+
+                return (
+                  <div
+                    key={unit.unitIdx}
+                    className="rounded-2xl border border-charcoal/10 overflow-hidden bg-white shadow-2xs transition-all"
+                  >
+                    {/* CacheUp-Styled Unit Dropdown Header Bar */}
+                    <button
+                      type="button"
+                      onClick={() => toggleUnitDropdown(idx)}
+                      className={`w-full p-4 bg-cream/45 hover:bg-cream/80 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer ${
+                        isOpen ? 'border-b border-charcoal/10' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-forest/10 text-forest flex items-center justify-center font-bold text-xs shrink-0">
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-bold text-forest uppercase tracking-wider block">
+                            {unit.unitLabel} • {unit.lessons.length} Lessons
+                          </span>
+                          <h4 className="text-xs sm:text-sm font-bold text-charcoal font-heading break-words leading-snug">
+                            {unit.unitTitle}
+                          </h4>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span
+                          className={`px-3 py-1 rounded-full text-[11px] font-semibold border ${
+                            unitDone
+                              ? 'bg-forest-50 text-forest border-forest/20'
+                              : unitUnlocked
+                              ? 'bg-white text-charcoal-muted border-charcoal/10'
+                              : 'bg-cream text-charcoal-muted border-charcoal/10'
+                          }`}
+                        >
+                          {unitDone
+                            ? 'Completed'
+                            : unitUnlocked
+                            ? 'Complete All Items'
+                            : 'Prerequisites Required'}
+                        </span>
+                        {unitDone ? (
+                          <Check className="w-4 h-4 text-forest stroke-[2.5]" />
+                        ) : !unitUnlocked ? (
+                          <Lock className="w-4 h-4 text-charcoal-muted" />
+                        ) : (
+                          <Circle className="w-4 h-4 text-charcoal/25" />
+                        )}
+                        {isOpen ? (
+                          <ChevronDown className="w-4 h-4 text-charcoal-muted shrink-0" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-charcoal-muted shrink-0" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Dropdown Items (Lessons, Materials & Unit Tasks) */}
+                    {isOpen && (
+                      <div className="divide-y divide-charcoal/10 bg-white">
+                        {/* 1. Lesson Pages */}
+                        {unit.lessons.map((lesson, lIdx) => {
+                          const isViewed = viewedLessonIds.includes(lesson.id);
+                          const prevLessonViewed =
+                            lIdx === 0 ||
+                            viewedLessonIds.includes(unit.lessons[lIdx - 1].id);
+                          const lessonUnlocked =
+                            !isStudent || (unitUnlocked && prevLessonViewed);
+
+                          return (
+                            <div
+                              key={lesson.id}
+                              onClick={() => {
+                                if (!lessonUnlocked) {
+                                  addToast(
+                                    'Please view the previous lesson/unit items first to unlock this lesson.',
+                                    'info'
+                                  );
+                                  return;
+                                }
+                                markLessonAsViewed(lesson.id);
+                                setSelectedLessonId(lesson.id);
+                                setActiveTab('course-lesson');
+                              }}
+                              className={`px-5 py-3.5 flex items-center justify-between gap-4 transition-colors ${
+                                lessonUnlocked
+                                  ? 'hover:bg-cream/40 cursor-pointer group'
+                                  : 'opacity-55 bg-cream/20 cursor-not-allowed'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-forest-50 text-forest flex items-center justify-center shrink-0">
+                                  <FileText className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="text-xs sm:text-sm font-bold text-charcoal group-hover:text-forest transition-colors break-words leading-snug">
+                                    {unit.unitLabel}: {lesson.title}
+                                  </h4>
+                                  <p className="text-[11px] text-charcoal-muted mt-0.5">
+                                    {isViewed
+                                      ? 'Viewed'
+                                      : lessonUnlocked
+                                      ? 'View Lesson Page'
+                                      : 'Must view preceding item first'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0">
+                                {isViewed ? (
+                                  <Check className="w-4 h-4 text-forest stroke-[2.5]" />
+                                ) : !lessonUnlocked ? (
+                                  <Lock className="w-3.5 h-3.5 text-charcoal-muted" />
+                                ) : (
+                                  <Circle className="w-4 h-4 text-charcoal/25" />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* 2. Unit Attachments / PDFs */}
+                        {unit.materials.map((mat) => (
+                          <div
+                            key={mat.id}
+                            onClick={() => setActiveSection('materials')}
+                            className="px-5 py-3.5 flex items-center justify-between gap-4 hover:bg-cream/40 transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-sage/20 text-forest flex items-center justify-center shrink-0">
+                                <Paperclip className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-xs sm:text-sm font-bold text-charcoal group-hover:text-forest transition-colors break-words leading-snug block">
+                                  {mat.title}.{mat.type}
+                                </span>
+                                <span className="text-[11px] text-charcoal-muted">
+                                  Study Resource • {mat.size}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-semibold text-forest shrink-0">
+                              View
+                            </span>
+                          </div>
+                        ))}
+
+                        {/* 3. Unit Assignments / Graded Tasks needed before next unit */}
+                        {unit.assignments.map((asg) => {
+                          const done = isAssignmentDone(asg);
+                          const taskUnlocked =
+                            !isStudent ||
+                            done ||
+                            (unitUnlocked && allLessonsInUnitViewed);
+
+                          return (
+                            <div
+                              key={asg.id}
+                              onClick={() => {
+                                if (!taskUnlocked) {
+                                  addToast(
+                                    'Please view all lessons in this unit before starting the unit task.',
+                                    'info'
+                                  );
+                                  return;
+                                }
+                                setAssignmentOrigin('course-details');
+                                setSelectedAssignmentId(asg.id);
+                                setActiveTab('assignment-details');
+                              }}
+                              className={`px-5 py-3.5 flex items-center justify-between gap-4 transition-colors ${
+                                taskUnlocked
+                                  ? 'hover:bg-cream/40 cursor-pointer group'
+                                  : 'opacity-55 bg-cream/20 cursor-not-allowed'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-gold/20 text-gold-dark flex items-center justify-center shrink-0">
+                                  <Rocket className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="text-xs sm:text-sm font-bold text-charcoal group-hover:text-forest transition-colors break-words leading-snug">
+                                    Graded Task: {asg.title}
+                                  </h4>
+                                  <p className="text-[11px] text-charcoal-muted mt-0.5">
+                                    Due {asg.dueDate} • {asg.maxScore || 100} pts
+                                    {done ? ' • Submitted' : ' • Required to complete unit'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0">
+                                {done ? (
+                                  <Check className="w-4 h-4 text-forest stroke-[2.5]" />
+                                ) : !taskUnlocked ? (
+                                  <Lock className="w-3.5 h-3.5 text-charcoal-muted" />
+                                ) : (
+                                  <Circle className="w-4 h-4 text-charcoal/25" />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <span className="text-xs font-semibold text-charcoal-muted px-2.5 py-1 rounded-lg bg-white border border-charcoal/5">
-                    {unit.lessons} Lessons
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -287,7 +538,11 @@ export const CourseDetails = () => {
               {courseAssignments.map((asg) => (
                 <div
                   key={asg.id}
-                  className="p-4 rounded-2xl border border-charcoal/10 bg-cream/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  onClick={() => {
+                    setSelectedAssignmentId(asg.id);
+                    setActiveTab('assignment-details');
+                  }}
+                  className="p-4 rounded-2xl border border-charcoal/10 bg-cream/40 hover:border-forest/30 hover:shadow-xs transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -309,7 +564,8 @@ export const CourseDetails = () => {
                   </div>
 
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSelectedAssignmentId(asg.id);
                       setActiveTab('assignment-details');
                     }}

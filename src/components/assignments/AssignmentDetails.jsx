@@ -22,6 +22,7 @@ export const AssignmentDetails = () => {
     submissions,
     setActiveTab,
     deleteAssignment,
+    assignmentOrigin,
   } = useLMS();
 
   const assignment = assignments.find((a) => a.id === selectedAssignmentId) || assignments[0];
@@ -33,17 +34,20 @@ export const AssignmentDetails = () => {
   );
 
   const isTeacherOrAdmin = currentUser?.role === 'teacher' || currentUser?.role === 'admin';
+  const backTarget = assignmentOrigin === 'course-details' ? 'course-details' : 'todo';
+  const backLabel =
+    assignmentOrigin === 'course-details' ? 'Back to Course Details' : 'Back to To-Do';
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Return Navigation */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => setActiveTab('assignments')}
+          onClick={() => setActiveTab(backTarget)}
           className="inline-flex items-center gap-2 text-xs font-bold text-charcoal hover:text-forest transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Assignments</span>
+          <span>{backLabel}</span>
         </button>
 
         {isTeacherOrAdmin && (
@@ -52,7 +56,7 @@ export const AssignmentDetails = () => {
               onClick={() => {
                 if (confirm('Delete this assignment?')) {
                   deleteAssignment(assignment.id);
-                  setActiveTab('assignments');
+                  setActiveTab(backTarget);
                 }
               }}
               className="p-2 rounded-xl text-red-600 hover:bg-red-50 text-xs font-bold transition-colors"

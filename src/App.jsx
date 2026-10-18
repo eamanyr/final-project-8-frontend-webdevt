@@ -19,12 +19,14 @@ import { AdminDashboard } from './components/dashboard/AdminDashboard';
 // Courses
 import { CourseList } from './components/courses/CourseList';
 import { CourseDetails } from './components/courses/CourseDetails';
+import { LessonPage } from './components/courses/LessonPage';
 import { CourseForm } from './components/courses/CourseForm';
 
 // Materials
 import { LearningMaterials } from './components/materials/LearningMaterials';
 
 // Assignments & Submissions
+import { TodoList } from './components/assignments/TodoList';
 import { AssignmentDetails } from './components/assignments/AssignmentDetails';
 import { AssignmentForm } from './components/assignments/AssignmentForm';
 import { AssignmentSubmit } from './components/assignments/AssignmentSubmit';
@@ -38,17 +40,24 @@ import { MyProgress } from './components/progress/MyProgress';
 import { PendingApprovals } from './components/admin/PendingApprovals';
 import { UserManagement } from './components/admin/UserManagement';
 
-// Announcements & Profile
+// Announcements, Profile & Schedule
 import { Announcements } from './components/announcements/Announcements';
 import { Profile } from './components/profile/Profile';
 import { AccountSettings } from './components/profile/AccountSettings';
+import { SchedulePage } from './components/schedule/SchedulePage';
 
 /* ---------- Route guards ---------- */
+
+const getHomePathForRole = (role) => {
+  if (role === 'admin') return '/admin';
+  if (role === 'teacher') return '/teacher';
+  return '/dashboard';
+};
 
 // Login / Register: logged-in users go straight to their dashboard.
 const PublicOnly = ({ children }) => {
   const { currentUser } = useLMS();
-  return currentUser ? <Navigate to="/dashboard" replace /> : children;
+  return currentUser ? <Navigate to={getHomePathForRole(currentUser.role)} replace /> : children;
 };
 
 // Everything inside the app shell needs a logged-in user.
@@ -78,17 +87,19 @@ const AppLayout = () => {
   );
 };
 
-// Only the listed roles may open the page; everyone else goes to the dashboard.
+// Only the listed roles may open the page; everyone else goes to their role's dashboard.
 const RequireRole = ({ roles, children }) => {
   const { currentUser } = useLMS();
-  return roles.includes(currentUser.role) ? children : <Navigate to="/dashboard" replace />;
+  return roles.includes(currentUser.role) ? (
+    children
+  ) : (
+    <Navigate to={getHomePathForRole(currentUser.role)} replace />
+  );
 };
 
-const DashboardByRole = () => {
+const RoleDashboardRedirect = () => {
   const { currentUser } = useLMS();
-  if (currentUser.role === 'teacher') return <TeacherDashboard />;
-  if (currentUser.role === 'admin') return <AdminDashboard />;
-  return <StudentDashboard />;
+  return <Navigate to={getHomePathForRole(currentUser?.role)} replace />;
 };
 
 /* ---------- Routes ---------- */
@@ -104,10 +115,22 @@ const AppRoutes = () => (
 
       {/* Logged-in app */}
       <Route element={<AppLayout />}>
-        <Route path="/dashboard" element={<DashboardByRole />} />
+        <Route
+          path="/dashboard"
+          element={<RequireRole roles={['student']}><StudentDashboard /></RequireRole>}
+        />
+        <Route
+          path="/teacher"
+          element={<RequireRole roles={['teacher']}><TeacherDashboard /></RequireRole>}
+        />
+        <Route
+          path="/admin"
+          element={<RequireRole roles={['admin']}><AdminDashboard /></RequireRole>}
+        />
 
         <Route path="/courses" element={<CourseList />} />
         <Route path="/course-details" element={<CourseDetails />} />
+        <Route path="/course-lesson" element={<LessonPage />} />
         <Route
           path="/courses/new"
           element={<RequireRole roles={['teacher', 'admin']}><CourseForm /></RequireRole>}
@@ -115,7 +138,8 @@ const AppRoutes = () => (
 
         <Route path="/materials" element={<LearningMaterials />} />
 
-        <Route path="/assignments" element={<AssignmentDetails />} />
+        <Route path="/todo" element={<TodoList />} />
+        <Route path="/assignments" element={<TodoList />} />
         <Route path="/assignments/details" element={<AssignmentDetails />} />
         <Route
           path="/assignments/new"
@@ -147,10 +171,11 @@ const AppRoutes = () => (
 
         <Route path="/announcements" element={<Announcements />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/schedule" element={<SchedulePage />} />
         <Route path="/settings" element={<AccountSettings />} />
 
         {/* Unknown URL */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<RoleDashboardRedirect />} />
       </Route>
     </Routes>
 

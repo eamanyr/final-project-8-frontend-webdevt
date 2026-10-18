@@ -1,49 +1,96 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLMS } from '../../context/LMSContext';
+import {
+  SCHEDULE_COLOR_PALETTE,
+  getItemDays,
+  getItemTimeRange,
+} from '../schedule/WeeklyCalendarGrid';
 import {
   ChevronLeft,
   ChevronRight,
   Edit2,
-  Clock,
   Calendar as CalendarIcon,
-  BellRing,
-  BookOpen,
-  CheckCircle2,
-  ExternalLink
 } from 'lucide-react';
 
 export const RightPanel = () => {
   const {
     currentUser,
     schedule,
-    reminders,
+    assignments,
+    submissions,
     setActiveTab,
+    setSelectedAssignmentId,
+    setAssignmentOrigin,
     isRightPanelOpen,
   } = useLMS();
 
-  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 9, 1)); // October 2026
-  const [selectedDay, setSelectedDay] = useState(15);
+  // Real-time current date
+  const [realTimeNow, setRealTimeNow] = useState(() => new Date());
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setRealTimeNow(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (!currentUser || !isRightPanelOpen) return null;
 
   const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 
   const daysOfWeek = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const fullWeekdays = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ];
 
   const prevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)
+    );
   };
 
   const nextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
+    );
   };
 
-  // Generate calendar days for October 2026 (or active month)
-  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-  const firstDayIndex = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+  const jumpToToday = () => {
+    const now = new Date();
+    setRealTimeNow(now);
+    setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    setSelectedDate(now);
+  };
+
+  // Generate calendar days for active month
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
 
   const calendarDays = [];
   for (let i = 0; i < firstDayIndex; i++) {
@@ -53,18 +100,36 @@ export const RightPanel = () => {
     calendarDays.push(d);
   }
 
-  // Days with scheduled classes/deadlines
-  const activeEventDays = [5, 12, 15, 18, 22, 24, 28];
+  // Which weekdays have scheduled classes?
+  const scheduledWeekdays = new Set(
+    (schedule || []).flatMap((item) => getItemDays(item))
+  );
+
+  // Selected day's weekday & schedule items
+  const selectedWeekday = fullWeekdays[selectedDate.getDay()];
+  const isSelectedToday =
+    selectedDate.getFullYear() === realTimeNow.getFullYear() &&
+    selectedDate.getMonth() === realTimeNow.getMonth() &&
+    selectedDate.getDate() === realTimeNow.getDate();
+
+  const shortMonth = monthNames[selectedDate.getMonth()].slice(0, 3);
+  const selectedDateLabel = `${
+    isSelectedToday ? 'Today, ' : ''
+  }${selectedDate.getDate()} ${shortMonth} (${selectedWeekday.slice(0, 3)})`;
+
+  const daySchedule = (schedule || [])
+    .filter((item) => getItemDays(item).includes(selectedWeekday))
+    .sort((a, b) => getItemTimeRange(a)[0] - getItemTimeRange(b)[0]);
 
   return (
-    <aside className="w-80 2xl:w-88 shrink-0 bg-cream/50 border-l border-charcoal/10 p-5 hidden xl:flex flex-col gap-6 overflow-y-auto max-h-[calc(100vh-65px)]">
+    <aside className="sticky top-0 h-screen w-80 2xl:w-88 shrink-0 bg-cream/50 border-l border-charcoal/10 p-5 hidden xl:flex flex-col gap-6 overflow-y-auto">
       {/* Profile Card Widget */}
       <div className="bg-white rounded-3xl p-5 border border-charcoal/10 shadow-xs text-center relative group">
         <div className="flex items-center justify-between text-xs font-semibold text-charcoal mb-2">
           <span>Profile</span>
           <button
             onClick={() => setActiveTab('settings')}
-            className="p-1 rounded-full text-charcoal-muted hover:text-charcoal hover:bg-black/5 transition-colors"
+            className="p-1 rounded-full text-charcoal-muted hover:text-charcoal hover:bg-black/5 transition-colors cursor-pointer"
             title="Edit Settings"
           >
             <Edit2 className="w-3.5 h-3.5" />
@@ -90,29 +155,39 @@ export const RightPanel = () => {
         <div className="mt-4 flex items-center justify-center gap-2">
           <button
             onClick={() => setActiveTab('profile')}
-            className="px-5 py-1.5 rounded-full bg-forest text-cream text-xs font-semibold hover:bg-forest-light transition-all shadow-xs"
+            className="px-5 py-1.5 rounded-full bg-forest text-cream text-xs font-semibold hover:bg-forest-light transition-all shadow-xs cursor-pointer"
           >
             View Profile
           </button>
         </div>
       </div>
 
-      {/* Interactive Mini Calendar Widget (direct UI inspiration) */}
+      {/* Real-Time Interactive Mini Calendar Widget */}
       <div className="bg-white rounded-3xl p-5 border border-charcoal/10 shadow-xs">
         {/* Calendar Header with Navigation */}
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={prevMonth}
-            className="p-1.5 rounded-full hover:bg-cream text-charcoal transition-colors"
+            className="p-1.5 rounded-full hover:bg-cream text-charcoal transition-colors cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-xs font-bold font-heading text-charcoal">
-            {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold font-heading text-charcoal">
+              {monthNames[month]} {year}
+            </span>
+            {!isSelectedToday && (
+              <button
+                onClick={jumpToToday}
+                className="text-[10px] font-bold text-forest bg-forest-50 hover:bg-forest-100 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+              >
+                Today
+              </button>
+            )}
+          </div>
           <button
             onClick={nextMonth}
-            className="p-1.5 rounded-full hover:bg-cream text-charcoal transition-colors"
+            className="p-1.5 rounded-full hover:bg-cream text-charcoal transition-colors cursor-pointer"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -136,23 +211,36 @@ export const RightPanel = () => {
             if (!day) {
               return <div key={`empty-${idx}`} className="h-7 w-7 mx-auto" />;
             }
-            const isSelected = day === selectedDay;
-            const hasEvent = activeEventDays.includes(day);
+            const dateObj = new Date(year, month, day);
+            const weekdayName = fullWeekdays[dateObj.getDay()];
+            const hasClassOnDay = scheduledWeekdays.has(weekdayName);
+
+            const isSelected =
+              selectedDate.getFullYear() === year &&
+              selectedDate.getMonth() === month &&
+              selectedDate.getDate() === day;
+
+            const isTodayCell =
+              realTimeNow.getFullYear() === year &&
+              realTimeNow.getMonth() === month &&
+              realTimeNow.getDate() === day;
 
             return (
               <button
                 key={day}
-                onClick={() => setSelectedDay(day)}
-                className={`h-7 w-7 mx-auto text-xs font-medium rounded-full flex flex-col items-center justify-center relative transition-all ${
+                onClick={() => setSelectedDate(new Date(year, month, day))}
+                className={`h-7 w-7 mx-auto text-xs font-medium rounded-full flex flex-col items-center justify-center relative transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-charcoal text-cream font-bold shadow-xs'
-                    : hasEvent
+                    ? 'bg-forest text-cream font-bold shadow-xs'
+                    : isTodayCell
+                    ? 'ring-1.5 ring-forest text-forest font-bold bg-forest-50'
+                    : hasClassOnDay
                     ? 'text-charcoal font-semibold hover:bg-cream'
                     : 'text-charcoal-muted hover:bg-cream/60'
                 }`}
               >
                 <span>{day}</span>
-                {hasEvent && !isSelected && (
+                {hasClassOnDay && !isSelected && (
                   <span className="w-1 h-1 rounded-full bg-gold absolute bottom-0.5" />
                 )}
               </button>
@@ -161,85 +249,144 @@ export const RightPanel = () => {
         </div>
       </div>
 
-      {/* Schedule Section (direct UI inspiration) */}
+      {/* Daily Schedule Section (Real-Time Filtered for Selected Day) */}
       <div className="bg-white rounded-3xl p-5 border border-charcoal/10 shadow-xs">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1.5">
-            <h4 className="text-sm font-bold font-heading text-charcoal">Schedule</h4>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage/20 text-forest">
-              {selectedDay} Oct
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h4 className="text-sm font-bold font-heading text-charcoal shrink-0">
+              Schedule
+            </h4>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-forest-50 text-forest border border-forest/15 truncate">
+              {selectedDateLabel}
             </span>
           </div>
           <button
-            onClick={() => setActiveTab('courses')}
-            className="text-[11px] font-semibold text-charcoal-muted hover:text-forest transition-colors"
+            onClick={() => setActiveTab('schedule')}
+            className="text-[11px] font-semibold text-charcoal-muted hover:text-forest transition-colors shrink-0 cursor-pointer"
           >
             See all
           </button>
         </div>
 
-        <div className="flex flex-col gap-2.5">
-          {schedule.map((item) => {
-            const bgClass =
-              item.color === 'gold'
-                ? 'bg-gradient-to-r from-amber-50 to-amber-100/70 border-amber-200'
-                : item.color === 'sage'
-                ? 'bg-gradient-to-r from-emerald-50 to-emerald-100/60 border-emerald-200'
-                : 'bg-gradient-to-r from-stone-50 to-stone-100 border-charcoal/10';
+        {daySchedule.length === 0 ? (
+          <div className="p-4 rounded-2xl bg-cream/60 border border-charcoal/10 text-center">
+            <p className="text-xs font-semibold text-charcoal">
+              No classes on {selectedWeekday}
+            </p>
+            <p className="text-[11px] text-charcoal-muted mt-0.5">
+              Select another day on the calendar or click See all.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {daySchedule.map((item) => {
+              const palette =
+                SCHEDULE_COLOR_PALETTE[item.color] ||
+                SCHEDULE_COLOR_PALETTE.sage;
 
-            return (
-              <div
-                key={item.id}
-                className={`p-3 rounded-2xl border transition-all hover:scale-[1.01] ${bgClass}`}
-              >
-                <div className="flex items-start justify-between">
-                  <span className="text-xs font-bold text-charcoal">
-                    {item.time.split(' - ')[0]}
-                  </span>
-                  <span className="text-[10px] font-medium text-charcoal-muted">
-                    {item.location}
-                  </span>
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => setActiveTab('schedule')}
+                  style={{
+                    backgroundColor: palette.bg,
+                    color: palette.text,
+                    borderColor: palette.border,
+                  }}
+                  className="p-3 rounded-2xl border-[1.5px] transition-all hover:scale-[1.01] hover:brightness-97 cursor-pointer shadow-2xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-xs font-extrabold">
+                      {item.time || `${item.startTime} - ${item.endTime}`}
+                    </span>
+                    <span className="text-[10px] font-semibold opacity-85 shrink-0">
+                      {item.location}
+                    </span>
+                  </div>
+                  <h5 className="text-xs font-bold mt-1 line-clamp-1 font-heading">
+                    {item.code ? `${item.code}: ${item.title}` : item.title}
+                  </h5>
+                  <p className="text-[11px] opacity-85 mt-0.5 truncate font-medium">
+                    {selectedWeekday} • {item.instructor}
+                  </p>
                 </div>
-                <h5 className="text-xs font-bold text-charcoal mt-1 line-clamp-1">
-                  {item.title}
-                </h5>
-                <p className="text-[11px] text-charcoal-muted mt-0.5">
-                  {item.course} • {item.instructor}
-                </p>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Reminders Section (direct UI inspiration) */}
+      {/* Reminders Section (Aligned with To-Do List) */}
       <div className="bg-white rounded-3xl p-5 border border-charcoal/10 shadow-xs">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-bold font-heading text-charcoal">Reminders</h4>
-          <BellRing className="w-4 h-4 text-gold-dark" />
+          <h4 className="text-sm font-bold font-heading text-charcoal">
+            Reminders
+          </h4>
+          <button
+            onClick={() => setActiveTab('todo')}
+            className="text-[11px] font-semibold text-charcoal-muted hover:text-forest transition-colors cursor-pointer"
+          >
+            To-Do List
+          </button>
         </div>
 
-        <div className="flex flex-col gap-2.5">
-          {reminders.map((rem) => (
-            <div
-              key={rem.id}
-              onClick={() => setActiveTab('assignments')}
-              className="flex items-start gap-3 p-2.5 rounded-2xl hover:bg-cream/70 transition-colors cursor-pointer group"
-            >
-              <div className="w-8 h-8 rounded-xl bg-sage/20 text-forest flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <CalendarIcon className="w-4 h-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h5 className="text-xs font-semibold text-charcoal truncate">
-                  {rem.title}
-                </h5>
-                <p className="text-[11px] text-charcoal-muted mt-0.5">
-                  {rem.date}
-                </p>
-              </div>
+        {(() => {
+          const pendingTodoReminders = (assignments || [])
+            .filter((asg) => {
+              if (currentUser.role === 'student') {
+                const inEnrolledCourse =
+                  !currentUser.enrolledCourseIds?.length ||
+                  currentUser.enrolledCourseIds.includes(asg.courseId);
+                const alreadySubmitted = (submissions || []).some(
+                  (s) =>
+                    s.assignmentId === asg.id && s.studentId === currentUser.id
+                );
+                return (
+                  inEnrolledCourse &&
+                  !alreadySubmitted &&
+                  asg.status !== 'Graded'
+                );
+              }
+              return asg.status !== 'Graded';
+            })
+            .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+          if (pendingTodoReminders.length === 0) {
+            return (
+              <p className="text-xs text-charcoal-muted text-center py-4">
+                No pending To-Do assignments!
+              </p>
+            );
+          }
+
+          return (
+            <div className="flex flex-col gap-2.5">
+              {pendingTodoReminders.map((asg) => (
+                <div
+                  key={asg.id}
+                  onClick={() => {
+                    setAssignmentOrigin('todo');
+                    setSelectedAssignmentId(asg.id);
+                    setActiveTab('assignment-details');
+                  }}
+                  className="flex items-start gap-3 p-2.5 rounded-2xl hover:bg-cream/70 transition-colors cursor-pointer group"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-sage/20 text-forest flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <CalendarIcon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h5 className="text-xs font-semibold text-charcoal truncate group-hover:text-forest transition-colors">
+                      {asg.title}
+                    </h5>
+                    <p className="text-[11px] text-charcoal-muted mt-0.5 truncate">
+                      Due {asg.dueDate} • {asg.courseName}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </div>
     </aside>
   );

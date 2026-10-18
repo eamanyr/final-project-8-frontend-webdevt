@@ -6,6 +6,8 @@ import {
   Phone,
   Building,
   Calendar,
+  Clock,
+  MapPin,
   Award,
   BookOpen,
   Edit3,
@@ -13,8 +15,18 @@ import {
   Sparkles
 } from 'lucide-react';
 
+import { WeeklyCalendarGrid } from '../schedule/WeeklyCalendarGrid';
+
 export const Profile = () => {
-  const { currentUser, courses, setActiveTab } = useLMS();
+  const {
+    currentUser,
+    courses,
+    schedule,
+    scheduleTitle,
+    setActiveTab,
+    setSelectedCourseId,
+    setIsScheduleEditMode,
+  } = useLMS();
 
   if (!currentUser) return null;
 
@@ -25,7 +37,7 @@ export const Profile = () => {
   );
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
       {/* Profile Header Banner */}
       <div className="bg-white rounded-3xl border border-charcoal/10 overflow-hidden shadow-xs">
         {/* Cover Graphic */}
@@ -93,43 +105,83 @@ export const Profile = () => {
         </div>
       </div>
 
-      {/* Course Affiliations */}
-      <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
-        <h3 className="text-base font-bold font-heading text-charcoal mb-4">
-          {currentUser.role === 'teacher' ? 'Courses Instructed' : 'Enrolled Courses'}
-        </h3>
+      {/* Course Affiliations (Students & Teachers only) */}
+      {currentUser.role !== 'admin' && (
+        <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+          <h3 className="text-base font-bold font-heading text-charcoal mb-4">
+            {currentUser.role === 'teacher' ? 'Courses Instructed' : 'Enrolled Courses'}
+          </h3>
 
-        {myCourses.length === 0 ? (
-          <p className="text-xs text-charcoal-muted text-center py-6">
-            No courses currently affiliated.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {myCourses.map((c) => (
-              <div
-                key={c.id}
-                className="p-4 rounded-2xl border border-charcoal/10 bg-cream/30 flex items-center gap-3"
-              >
-                <img
-                  src={c.thumbnail}
-                  alt=""
-                  className="w-14 h-14 rounded-xl object-cover border border-charcoal/10 shrink-0"
-                />
-                <div className="min-w-0">
-                  <span className="text-[10px] font-bold text-forest uppercase tracking-wider">
-                    {c.code}
-                  </span>
-                  <h4 className="text-xs font-bold text-charcoal truncate">
-                    {c.title}
-                  </h4>
-                  <p className="text-[11px] text-charcoal-muted mt-0.5">
-                    {c.duration} • {c.level}
-                  </p>
+          {myCourses.length === 0 ? (
+            <p className="text-xs text-charcoal-muted text-center py-6">
+              No courses currently affiliated.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {myCourses.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => {
+                    setSelectedCourseId(c.id);
+                    setActiveTab('course-details');
+                  }}
+                  className="p-4 rounded-2xl border border-charcoal/10 bg-cream/30 hover:border-forest/30 hover:shadow-xs transition-all cursor-pointer flex items-center gap-3"
+                >
+                  <img
+                    src={c.thumbnail}
+                    alt=""
+                    className="w-14 h-14 rounded-xl object-cover border border-charcoal/10 shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold text-forest uppercase tracking-wider">
+                      {c.code}
+                    </span>
+                    <h4 className="text-xs font-bold text-charcoal truncate">
+                      {c.title}
+                    </h4>
+                    <p className="text-[11px] text-charcoal-muted mt-0.5">
+                      {c.duration} • {c.level}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Weekly Schedule Section (Gizmoa-style Week Calendar) */}
+      <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div>
+            <h3 className="text-base font-bold font-heading text-charcoal">
+              My Schedule
+            </h3>
+            <p className="text-xs text-charcoal-muted mt-0.5">
+              Weekly studio &amp; lecture timetable (click any block or button to customize)
+            </p>
           </div>
-        )}
+
+          <button
+            onClick={() => {
+              setIsScheduleEditMode(true);
+              setActiveTab('schedule');
+            }}
+            className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all flex items-center gap-1.5 shadow-sm self-start sm:self-center cursor-pointer"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>Edit &amp; Modify Schedule</span>
+          </button>
+        </div>
+
+        <WeeklyCalendarGrid
+          schedule={schedule}
+          scheduleTitle={scheduleTitle}
+          onSelectBlock={() => {
+            setIsScheduleEditMode(true);
+            setActiveTab('schedule');
+          }}
+        />
       </div>
     </div>
   );

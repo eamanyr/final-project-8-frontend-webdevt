@@ -10,8 +10,43 @@ import {
   Filter,
   X,
   Send,
-  Sparkles
+  Sparkles,
+  MessageSquare,
 } from 'lucide-react';
+
+const DEFAULT_REPLIES = {
+  'anc-1': [
+    {
+      id: 'rep-1',
+      authorName: 'Melissa Anderson',
+      authorRole: 'student',
+      authorAvatar:
+        'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
+      date: '2026-10-14 16:20',
+      content: 'So excited for the gallery showcase! Do we need to frame our canvas pieces ourselves?',
+    },
+    {
+      id: 'rep-2',
+      authorName: 'Prof. Alicia Mayer',
+      authorRole: 'teacher',
+      authorAvatar:
+        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
+      date: '2026-10-14 17:05',
+      content: 'The studio department will provide standard oak frames for all selected works!',
+    },
+  ],
+  'anc-2': [
+    {
+      id: 'rep-3',
+      authorName: 'Stella Walton',
+      authorRole: 'student',
+      authorAvatar:
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      date: '2026-10-12 18:10',
+      content: 'Looking forward to the Pentagram guest lecture! Will a recording be shared afterwards?',
+    },
+  ],
+};
 
 export const Announcements = () => {
   const {
@@ -21,10 +56,14 @@ export const Announcements = () => {
     addAnnouncement,
     markAnnouncementAsRead,
     deleteAnnouncement,
+    addAnnouncementReply,
+    selectedAnnouncementId,
+    setSelectedAnnouncementId,
   } = useLMS();
 
   const [filterPriority, setFilterPriority] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [replyText, setReplyText] = useState('');
 
   const [formData, setFormData] = useState({
     title: '',
@@ -34,6 +73,15 @@ export const Announcements = () => {
   });
 
   const isTeacherOrAdmin = currentUser?.role === 'teacher' || currentUser?.role === 'admin';
+
+  const getReplies = (item) => {
+    if (!item) return [];
+    return item.replies ?? DEFAULT_REPLIES[item.id] ?? [];
+  };
+
+  const selectedAnnouncement = announcements.find(
+    (a) => a.id === selectedAnnouncementId
+  );
 
   const filtered = announcements.filter((a) => {
     if (filterPriority !== 'all' && a.priority !== filterPriority) return false;
@@ -46,6 +94,22 @@ export const Announcements = () => {
     addAnnouncement(formData);
     setShowCreateModal(false);
     setFormData({ title: '', courseId: 'all', priority: 'Normal', content: '' });
+  };
+
+  const handleOpenAnnouncement = (item) => {
+    if (!item.isRead) {
+      markAnnouncementAsRead(item.id);
+    }
+    setSelectedAnnouncementId(item.id);
+    setReplyText('');
+  };
+
+  const handleSendReply = (e) => {
+    e.preventDefault();
+    if (!replyText.trim() || !selectedAnnouncement) return;
+    const currentReplies = getReplies(selectedAnnouncement);
+    addAnnouncementReply(selectedAnnouncement.id, replyText.trim(), currentReplies);
+    setReplyText('');
   };
 
   return (
@@ -97,14 +161,16 @@ export const Announcements = () => {
       <div className="space-y-4">
         {filtered.map((item) => {
           const isUrgent = item.priority === 'Urgent';
+          const repliesCount = getReplies(item).length;
 
           return (
             <div
               key={item.id}
-              className={`bg-white rounded-3xl p-6 border transition-all ${
+              onClick={() => handleOpenAnnouncement(item)}
+              className={`bg-white rounded-3xl p-6 border transition-all cursor-pointer group hover:shadow-md ${
                 isUrgent
-                  ? 'border-amber-300 bg-amber-50/20 shadow-sm'
-                  : 'border-charcoal/10 shadow-xs'
+                  ? 'border-amber-300 bg-amber-50/20 shadow-sm hover:border-amber-400'
+                  : 'border-charcoal/10 shadow-xs hover:border-forest/30'
               }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -133,7 +199,7 @@ export const Announcements = () => {
                       )}
                     </div>
 
-                    <h3 className="text-base font-bold font-heading text-charcoal mt-1.5">
+                    <h3 className="text-base font-bold font-heading text-charcoal group-hover:text-forest transition-colors mt-1.5">
                       {item.title}
                     </h3>
 
@@ -146,7 +212,10 @@ export const Announcements = () => {
                 <div className="flex items-center gap-2 self-end sm:self-start">
                   {!item.isRead && (
                     <button
-                      onClick={() => markAnnouncementAsRead(item.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markAnnouncementAsRead(item.id);
+                      }}
                       className="px-3 py-1 rounded-xl bg-cream border border-charcoal/15 text-[11px] font-semibold text-charcoal hover:bg-white transition-colors"
                     >
                       Mark as read
@@ -155,7 +224,10 @@ export const Announcements = () => {
 
                   {isTeacherOrAdmin && (
                     <button
-                      onClick={() => deleteAnnouncement(item.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteAnnouncement(item.id);
+                      }}
                       className="p-1.5 rounded-lg text-charcoal-muted hover:text-red-600 hover:bg-red-50"
                       title="Delete Announcement"
                     >
@@ -168,10 +240,160 @@ export const Announcements = () => {
               <div className="mt-4 pt-3 border-t border-charcoal/10 text-xs sm:text-sm text-charcoal leading-relaxed whitespace-pre-line">
                 {item.content}
               </div>
+
+              <div className="mt-4 pt-3 border-t border-charcoal/5 flex items-center justify-between text-xs text-charcoal-muted">
+                <span className="inline-flex items-center gap-1.5 font-semibold text-forest group-hover:underline">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>
+                    {repliesCount} {repliesCount === 1 ? 'Reply' : 'Replies'} • Click to view &amp; comment
+                  </span>
+                </span>
+              </div>
             </div>
           );
         })}
       </div>
+
+      {/* View Announcement & Reply/Comment Modal */}
+      {selectedAnnouncement && (
+        <div
+          onClick={() => setSelectedAnnouncementId(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/50 backdrop-blur-xs"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-2xl w-full max-h-[88vh] flex flex-col border border-charcoal/15 shadow-2xl overflow-hidden animate-in zoom-in-95"
+          >
+            {/* Modal Header */}
+            <div className="p-6 pb-4 border-b border-charcoal/10 flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <img
+                  src={selectedAnnouncement.authorAvatar}
+                  alt={selectedAnnouncement.authorName}
+                  className="w-11 h-11 rounded-2xl object-cover border border-charcoal/10 shrink-0"
+                />
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-forest bg-forest/10 px-2 py-0.5 rounded-md">
+                      {selectedAnnouncement.courseName}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                        selectedAnnouncement.priority === 'Urgent'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-cream text-charcoal border border-charcoal/10'
+                      }`}
+                    >
+                      {selectedAnnouncement.priority}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold font-heading text-charcoal mt-1.5">
+                    {selectedAnnouncement.title}
+                  </h3>
+                  <p className="text-xs text-charcoal-muted mt-0.5">
+                    Published by{' '}
+                    <strong className="text-charcoal">
+                      {selectedAnnouncement.authorName}
+                    </strong>{' '}
+                    ({selectedAnnouncement.authorRole}) • {selectedAnnouncement.date}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedAnnouncementId(null)}
+                className="p-1.5 rounded-xl text-charcoal-muted hover:text-charcoal hover:bg-cream transition-colors shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Body: Announcement Content + Replies */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {/* Announcement Full Message */}
+              <div className="p-4 rounded-2xl bg-cream/40 border border-charcoal/10 text-xs sm:text-sm text-charcoal leading-relaxed whitespace-pre-line">
+                {selectedAnnouncement.content}
+              </div>
+
+              {/* Comments / Replies Section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-charcoal-muted mb-3 flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5 text-forest" />
+                  <span>
+                    Replies &amp; Comments ({getReplies(selectedAnnouncement).length})
+                  </span>
+                </h4>
+
+                {getReplies(selectedAnnouncement).length === 0 ? (
+                  <p className="text-xs text-charcoal-muted py-4 text-center bg-cream/20 rounded-2xl border border-charcoal/5">
+                    No comments yet. Be the first to reply to this announcement!
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {getReplies(selectedAnnouncement).map((reply) => (
+                      <div
+                        key={reply.id}
+                        className="p-3.5 rounded-2xl bg-cream/30 border border-charcoal/10 flex items-start gap-3"
+                      >
+                        <img
+                          src={reply.authorAvatar}
+                          alt={reply.authorName}
+                          className="w-8 h-8 rounded-full object-cover border border-charcoal/10 shrink-0 mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-charcoal">
+                                {reply.authorName}
+                              </span>
+                              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-forest/10 text-forest">
+                                {reply.authorRole}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-charcoal-muted">
+                              {reply.date}
+                            </span>
+                          </div>
+                          <p className="text-xs text-charcoal mt-1 leading-relaxed">
+                            {reply.content}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Reply Input Footer */}
+            <form
+              onSubmit={handleSendReply}
+              className="p-4 sm:px-6 bg-cream/40 border-t border-charcoal/10 flex items-center gap-2.5"
+            >
+              <img
+                src={currentUser?.avatar}
+                alt={currentUser?.name}
+                className="w-8 h-8 rounded-full object-cover border border-charcoal/10 shrink-0 hidden sm:block"
+              />
+              <input
+                type="text"
+                required
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Write a comment or reply to this announcement..."
+                className="flex-1 bg-white border border-charcoal/15 rounded-xl px-3.5 py-2.5 text-xs text-charcoal placeholder:text-charcoal-muted/70 focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all shadow-sm flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Reply</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Create Announcement Modal */}
       {showCreateModal && (

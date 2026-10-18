@@ -38,7 +38,23 @@ export const LMSProvider = ({ children }) => {
 
   const [courses, setCourses] = useState(() => {
     const saved = localStorage.getItem('cacheup_courses');
-    return saved ? JSON.parse(saved) : INITIAL_COURSES;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((c) =>
+          c.thumbnail?.includes('photo-1579783902614-a3fb3927b675')
+            ? {
+                ...c,
+                thumbnail:
+                  'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80',
+              }
+            : c
+        );
+      } catch {
+        return INITIAL_COURSES;
+      }
+    }
+    return INITIAL_COURSES;
   });
 
   const [assignments, setAssignments] = useState(() => {
@@ -63,7 +79,32 @@ export const LMSProvider = ({ children }) => {
 
   const [schedule, setSchedule] = useState(() => {
     const saved = localStorage.getItem('cacheup_schedule');
-    return saved ? JSON.parse(saved) : INITIAL_SCHEDULE;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.some((item) => item.startTime || item.days)) {
+          return parsed.map((item) => {
+            if (item.id === 'sch-6' && Array.isArray(item.days) && item.days.length === 1 && item.days[0] === 'Saturday') {
+              return { ...item, days: ['Saturday', 'Sunday'], day: 'Sat, Sun' };
+            }
+            if (item.id === 'sch-3' && Array.isArray(item.days) && item.days.length === 1 && item.days[0] === 'Thursday') {
+              return { ...item, days: ['Tuesday', 'Thursday'], day: 'Tue, Thu' };
+            }
+            return item;
+          });
+        }
+      } catch {
+        // Fallback to INITIAL_SCHEDULE
+      }
+    }
+    return INITIAL_SCHEDULE;
+  });
+
+  const [scheduleTitle, setScheduleTitle] = useState(() => {
+    return (
+      localStorage.getItem('cacheup_schedule_title') ||
+      '1st Semester Studio & Lecture Schedule'
+    );
   });
 
   const [reminders, setReminders] = useState(() => {
@@ -75,17 +116,82 @@ export const LMSProvider = ({ children }) => {
   // CHANGED: the active page now comes from the URL
   const navigate = useNavigate();
   const location = useLocation();
-  const activeTab = PATH_TO_TAB[location.pathname] ?? 'dashboard';
-  const setActiveTab = (tab) => navigate(TAB_PATHS[tab] ?? '/dashboard');
+
+  const getDashboardPath = (user = currentUser) => {
+    if (user?.role === 'admin') return '/admin';
+    if (user?.role === 'teacher') return '/teacher';
+    return '/dashboard';
+  };
+
+  const rawTab =
+    location.pathname === '/assignments' || location.pathname === '/todo'
+      ? 'assignments'
+      : PATH_TO_TAB[location.pathname] ?? 'dashboard';
+  const activeTab = rawTab === 'admin' || rawTab === 'teacher' ? 'dashboard' : rawTab;
 
   const [selectedCourseId, setSelectedCourseId] = useState('crs-1');
+  const [selectedLessonId, setSelectedLessonId] = useState('crs-1-u1-l1');
+  const [viewedLessonIds, setViewedLessonIds] = useState(() => {
+    const saved = localStorage.getItem('cacheup_viewed_lessons');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // Fallback
+      }
+    }
+    return [
+      'crs-1-u1-l1',
+      'crs-1-u1-l2',
+      'crs-2-u1-l1',
+      'crs-3-u1-l1',
+      'crs-3-u2-l1',
+      'crs-3-u3-l1',
+    ];
+  });
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('asg-1');
   const [selectedSubmissionId, setSelectedSubmissionId] = useState(null);
+  const [selectedAnnouncementId, setSelectedAnnouncementId] = useState(null);
+  const [assignmentOrigin, setAssignmentOrigin] = useState('todo');
+  const [isScheduleEditMode, setIsScheduleEditMode] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
+
+  const markLessonAsViewed = (lessonId) => {
+    if (!lessonId) return;
+    setViewedLessonIds((prev) =>
+      prev.includes(lessonId) ? prev : [...prev, lessonId]
+    );
+  };
+
+  useEffect(() => {
+    localStorage.setItem(
+      'cacheup_viewed_lessons',
+      JSON.stringify(viewedLessonIds)
+    );
+  }, [viewedLessonIds]);
+
+  const setActiveTab = (tab, userOverride) => {
+    const targetUser = userOverride !== undefined ? userOverride : currentUser;
+    if (tab === 'assignment-details') {
+      if (
+        location.pathname === '/course-details' ||
+        location.pathname === '/course-lesson'
+      ) {
+        setAssignmentOrigin('course-details');
+      } else if (location.pathname !== '/assignments/submit') {
+        setAssignmentOrigin('todo');
+      }
+    }
+    if (tab === 'dashboard') {
+      navigate(getDashboardPath(targetUser));
+      return;
+    }
+    navigate(TAB_PATHS[tab] ?? getDashboardPath(targetUser));
+  };
 
   // Save changes to localStorage
   useEffect(() => {
@@ -119,6 +225,10 @@ export const LMSProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('cacheup_announcements', JSON.stringify(announcements));
   }, [announcements]);
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_schedule', JSON.stringify(schedule));
+  }, [schedule]);
 
   // Toast Notification helper
   const addToast = (message, type = 'success') => {
@@ -155,14 +265,14 @@ export const LMSProvider = ({ children }) => {
       return false;
     }
     setCurrentUser(found);
-    setActiveTab('dashboard');
+    setActiveTab('dashboard', found);
     addToast(`Welcome back, ${found.name}!`, 'success');
     return true;
   };
 
   const logout = () => {
     setCurrentUser(null);
-    setActiveTab('login');
+    setActiveTab('login', null);
     addToast('You have been logged out securely.', 'info');
   };
 
@@ -178,7 +288,7 @@ export const LMSProvider = ({ children }) => {
     }
     if (target) {
       setCurrentUser(target);
-      setActiveTab('dashboard');
+      setActiveTab('dashboard', target);
       addToast(`Switched active persona to ${target.name} (${target.role.toUpperCase()})`, 'info');
     }
   };
@@ -332,10 +442,11 @@ export const LMSProvider = ({ children }) => {
       priority: data.priority || 'Medium',
       priorityColor: data.priority === 'High' ? 'gold' : data.priority === 'Low' ? 'sage' : 'forest',
       status: 'Pending',
+      publishedAt: new Date().toISOString().slice(0, 10),
       rubric: data.rubric || [{ criteria: 'Standard Execution & Quality', points: 100 }],
       submissionTypes: data.submissionTypes || ['pdf', 'link']
     };
-    setAssignments((prev) => [newAsg, ...prev]);
+    setAssignments((prev) => [...prev, newAsg]);
     addToast(`Assignment "${newAsg.title}" published!`, 'success');
     return newAsg;
   };
@@ -455,6 +566,76 @@ export const LMSProvider = ({ children }) => {
     addToast('Announcement deleted.', 'info');
   };
 
+  const addAnnouncementReply = (announcementId, content, existingReplies = []) => {
+    const newReply = {
+      id: `rep-${Date.now()}`,
+      authorName: currentUser?.name || 'Student',
+      authorRole: currentUser?.role || 'student',
+      authorAvatar:
+        currentUser?.avatar ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      date: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      content,
+    };
+    setAnnouncements((prev) =>
+      prev.map((a) =>
+        a.id === announcementId
+          ? { ...a, replies: [...(a.replies ?? existingReplies), newReply] }
+          : a
+      )
+    );
+    addToast('Comment posted to announcement!', 'success');
+  };
+
+  // Schedule actions
+  const addScheduleItem = (data) => {
+    const days = Array.isArray(data.days) && data.days.length > 0 ? data.days : [data.day || 'Monday'];
+    const newItem = {
+      id: `sch-${Date.now()}`,
+      code: data.code || 'CRS-101',
+      title: data.title,
+      course: data.course || data.title || 'General Studio',
+      days,
+      day: days.join(', '),
+      startTime: data.startTime || '09:00',
+      endTime: data.endTime || '10:30',
+      time: data.time || `${data.startTime || '09:00'} - ${data.endTime || '10:30'}`,
+      date: data.date || '2026-10-19',
+      color: data.color || 'sage',
+      instructor: data.instructor || 'Prof. Alicia Mayer',
+      location: data.location || 'Studio Lab A',
+    };
+    setSchedule((prev) => [...prev, newItem]);
+    addToast(`Added "${newItem.code || newItem.title}" to your weekly schedule!`, 'success');
+  };
+
+  const updateScheduleItem = (id, data) => {
+    const days = Array.isArray(data.days) && data.days.length > 0 ? data.days : [data.day || 'Monday'];
+    setSchedule((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...data,
+              days,
+              day: days.join(', '),
+              time: data.time || `${data.startTime || item.startTime} - ${data.endTime || item.endTime}`,
+            }
+          : item
+      )
+    );
+    addToast('Schedule session updated!', 'success');
+  };
+
+  const deleteScheduleItem = (id) => {
+    setSchedule((prev) => prev.filter((item) => item.id !== id));
+    addToast('Session removed from schedule.', 'info');
+  };
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_schedule_title', scheduleTitle);
+  }, [scheduleTitle]);
+
   // Reset demo data to initial defaults
   const resetDemoData = () => {
     localStorage.clear();
@@ -499,6 +680,8 @@ export const LMSProvider = ({ children }) => {
         materials,
         announcements,
         schedule,
+        scheduleTitle,
+        setScheduleTitle,
         reminders,
 
         // Course management
@@ -514,22 +697,36 @@ export const LMSProvider = ({ children }) => {
         submitAssignment,
         gradeSubmission,
 
-        // Materials & Announcements
+        // Materials, Announcements & Schedule
         addMaterial,
         deleteMaterial,
         addAnnouncement,
         markAnnouncementAsRead,
         deleteAnnouncement,
+        addAnnouncementReply,
+        addScheduleItem,
+        updateScheduleItem,
+        deleteScheduleItem,
 
         // Navigation & UI
         activeTab,
         setActiveTab,
         selectedCourseId,
         setSelectedCourseId,
+        selectedLessonId,
+        setSelectedLessonId,
+        viewedLessonIds,
+        markLessonAsViewed,
         selectedAssignmentId,
         setSelectedAssignmentId,
         selectedSubmissionId,
         setSelectedSubmissionId,
+        selectedAnnouncementId,
+        setSelectedAnnouncementId,
+        assignmentOrigin,
+        setAssignmentOrigin,
+        isScheduleEditMode,
+        setIsScheduleEditMode,
         searchQuery,
         setSearchQuery,
         isRightPanelOpen,

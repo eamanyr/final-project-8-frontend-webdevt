@@ -4,7 +4,7 @@ import {
   LayoutDashboard,
   BookOpen,
   FolderOpen,
-  FileCheck2,
+  ListTodo,
   GraduationCap,
   TrendingUp,
   Bell,
@@ -23,6 +23,8 @@ import {
 export const Sidebar = () => {
   const {
     currentUser,
+    assignments,
+    submissions,
     activeTab,
     setActiveTab,
     logout,
@@ -38,17 +40,36 @@ export const Sidebar = () => {
 
   const role = currentUser.role;
 
+  const studentTodoCount =
+    role === 'student'
+      ? assignments.filter((asg) => {
+          const inEnrolledCourse =
+            !currentUser.enrolledCourseIds?.length ||
+            currentUser.enrolledCourseIds.includes(asg.courseId);
+          const alreadySubmitted = submissions.some(
+            (s) => s.assignmentId === asg.id && s.studentId === currentUser.id
+          );
+          return inEnrolledCourse && !alreadySubmitted && asg.status !== 'Graded';
+        }).length
+      : null;
+
   // Define navigation items based on role
   const getNavItems = () => {
     const baseItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'courses', label: 'My Courses', icon: BookOpen },
-      { id: 'materials', label: 'Learning Materials', icon: FolderOpen },
+      { id: 'courses', label: role === 'admin' ? 'All Courses' : 'My Courses', icon: BookOpen },
+      {
+        id: 'announcements',
+        label: 'Announcements',
+        icon: Bell,
+        badge: unreadAnnouncementsCount > 0 ? unreadAnnouncementsCount : null,
+        badgeVariant: 'forest',
+      },
       {
         id: 'assignments',
-        label: 'Assignments',
-        icon: FileCheck2,
-        badge: role === 'student' ? 2 : null,
+        label: 'To-Do',
+        icon: ListTodo,
+        badge: role === 'student' && studentTodoCount > 0 ? studentTodoCount : null,
       },
     ];
 
@@ -87,13 +108,6 @@ export const Sidebar = () => {
     }
 
     baseItems.push(
-      {
-        id: 'announcements',
-        label: 'Announcements',
-        icon: Bell,
-        badge: unreadAnnouncementsCount > 0 ? unreadAnnouncementsCount : null,
-        badgeVariant: 'forest',
-      },
       { id: 'profile', label: 'Profile', icon: User },
       { id: 'settings', label: 'Settings', icon: Settings }
     );

@@ -22,9 +22,11 @@ export const StudentDashboard = () => {
     currentUser,
     courses,
     assignments,
+    submissions,
     setActiveTab,
     setSelectedCourseId,
     setSelectedAssignmentId,
+    setAssignmentOrigin,
   } = useLMS();
 
   const [courseFilter, setCourseFilter] = useState('all');
@@ -39,7 +41,19 @@ export const StudentDashboard = () => {
     return true;
   });
 
-  const pendingAssignments = assignments.filter((a) => a.status === 'Pending');
+  const pendingAssignments = assignments
+    .filter((asg) => {
+      const inEnrolledCourse =
+        !currentUser?.enrolledCourseIds?.length ||
+        currentUser.enrolledCourseIds.includes(asg.courseId);
+      const alreadySubmitted = submissions.some(
+        (s) => s.assignmentId === asg.id && s.studentId === currentUser?.id
+      );
+      return inEnrolledCourse && !alreadySubmitted && asg.status !== 'Graded';
+    })
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+  const nextAssignment = pendingAssignments[0] || null;
 
   return (
     <div className="space-y-6">
@@ -250,174 +264,6 @@ export const StudentDashboard = () => {
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Assignments & Home Tasks (Direct UI Inspiration Replica) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Assignments Card (Left 1 col) */}
-        <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold font-heading text-charcoal">
-                Assignments
-              </h3>
-              <button
-                onClick={() => setActiveTab('assignments')}
-                className="text-xs font-semibold text-charcoal-muted hover:text-forest"
-              >
-                Share / View
-              </button>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-cream border border-charcoal/10">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gold/20 text-gold-dark flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-charcoal">
-                    Award Show Discussion
-                  </h4>
-                  <p className="text-[11px] text-charcoal-muted mt-0.5">
-                    28 June 2026, 12:50 AM
-                  </p>
-                  <p className="text-[11px] font-semibold text-forest mt-1">
-                    Duration: 02 h 45 m
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-charcoal/10">
-                <button
-                  onClick={() => alert('Reschedule request sent to instructor.')}
-                  className="flex-1 py-1.5 px-3 rounded-xl border border-charcoal/20 text-[11px] font-bold text-charcoal hover:bg-white transition-colors"
-                >
-                  Reschedule
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedAssignmentId('asg-1');
-                    setActiveTab('assignment-submit');
-                  }}
-                  className="flex-1 py-1.5 px-3 rounded-xl bg-forest text-cream text-[11px] font-bold hover:bg-forest-light transition-colors shadow-xs"
-                >
-                  Submit Work
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Home Tasks Cards (Right 2 cols - exact UI match: Texture & Detail + Circles & Ovals) */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-bold font-heading text-charcoal">
-              Home Tasks
-            </h3>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-charcoal-muted">Today</span>
-              <button
-                onClick={() => setActiveTab('assignments')}
-                className="font-bold text-forest hover:underline"
-              >
-                View all tasks →
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Dark Task Card: Texture & Detail */}
-            <div
-              onClick={() => {
-                setSelectedAssignmentId('asg-1');
-                setActiveTab('assignment-details');
-              }}
-              className="p-5 rounded-3xl bg-charcoal text-cream flex flex-col justify-between cursor-pointer hover:scale-[1.01] transition-transform shadow-md"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold font-heading text-cream">
-                    Texture & Detail
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-gold">
-                    High ↗
-                  </span>
-                </div>
-                <p className="text-[11px] text-cream/70 mt-2 leading-relaxed">
-                  How to analyze and draw any subject by simplifying it into basic shapes.
-                </p>
-              </div>
-
-              <div className="mt-5 pt-3 border-t border-cream/15 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-cream/60 block">Course</span>
-                  <span className="text-xs font-bold text-cream">History Of Design</span>
-                </div>
-                <div className="flex -space-x-2">
-                  <img
-                    className="w-6 h-6 rounded-full border-2 border-charcoal"
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"
-                    alt=""
-                  />
-                  <img
-                    className="w-6 h-6 rounded-full border-2 border-charcoal"
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80"
-                    alt=""
-                  />
-                  <img
-                    className="w-6 h-6 rounded-full border-2 border-charcoal"
-                    src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80"
-                    alt=""
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Gold Task Card: Circles & Ovals */}
-            <div
-              onClick={() => {
-                setSelectedAssignmentId('asg-2');
-                setActiveTab('assignment-details');
-              }}
-              className="p-5 rounded-3xl bg-gold text-charcoal flex flex-col justify-between cursor-pointer hover:scale-[1.01] transition-transform shadow-md"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold font-heading text-charcoal">
-                    Circles & Ovals
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/15 text-charcoal">
-                    Low ↘
-                  </span>
-                </div>
-                <p className="text-[11px] text-charcoal/80 mt-2 leading-relaxed">
-                  Your circles should vary in size and your ovals should vary in size, angle and openness.
-                </p>
-              </div>
-
-              <div className="mt-5 pt-3 border-t border-black/10 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-charcoal/70 block">Course</span>
-                  <span className="text-xs font-bold text-charcoal">
-                    Illustration Techniques
-                  </span>
-                </div>
-                <div className="flex -space-x-2">
-                  <img
-                    className="w-6 h-6 rounded-full border-2 border-gold"
-                    src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=100&q=80"
-                    alt=""
-                  />
-                  <img
-                    className="w-6 h-6 rounded-full border-2 border-gold"
-                    src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=100&q=80"
-                    alt=""
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
