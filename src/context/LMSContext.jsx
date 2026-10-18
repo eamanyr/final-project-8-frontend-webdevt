@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+// CHANGED: router imports
+import { useNavigate, useLocation } from 'react-router-dom';
+import { TAB_PATHS, PATH_TO_TAB } from '../routes';
 import {
   INITIAL_USERS,
   INITIAL_COURSES,
@@ -27,11 +30,10 @@ export const LMSProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : INITIAL_USERS;
   });
 
+  // CHANGED: nobody is logged in by default
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('cacheup_current_user');
-    if (saved) return JSON.parse(saved);
-    // default to student Stella Walton
-    return INITIAL_USERS[0];
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [courses, setCourses] = useState(() => {
@@ -70,7 +72,12 @@ export const LMSProvider = ({ children }) => {
   });
 
   // Navigation and UI state
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // CHANGED: the active page now comes from the URL
+  const navigate = useNavigate();
+  const location = useLocation();
+  const activeTab = PATH_TO_TAB[location.pathname] ?? 'dashboard';
+  const setActiveTab = (tab) => navigate(TAB_PATHS[tab] ?? '/dashboard');
+
   const [selectedCourseId, setSelectedCourseId] = useState('crs-1');
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('asg-1');
   const [selectedSubmissionId, setSelectedSubmissionId] = useState(null);

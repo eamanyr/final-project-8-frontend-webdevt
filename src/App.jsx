@@ -1,4 +1,5 @@
 import React from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { LMSProvider, useLMS } from './context/LMSContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
@@ -6,7 +7,7 @@ import { RightPanel } from './components/layout/RightPanel';
 import { HelpModal } from './components/layout/HelpModal';
 import { ToastContainer } from './components/common/ToastContainer';
 
-// Auth Pages
+// Public pages
 import { Login } from './components/auth/Login';
 import { Register } from './components/auth/Register';
 
@@ -42,85 +43,19 @@ import { Announcements } from './components/announcements/Announcements';
 import { Profile } from './components/profile/Profile';
 import { AccountSettings } from './components/profile/AccountSettings';
 
-const MainAppContent = () => {
-  const { currentUser, activeTab } = useLMS();
+/* ---------- Route guards ---------- */
 
-  // If unauthenticated
-  if (!currentUser) {
-    if (activeTab === 'register') {
-      return (
-        <>
-          <Register />
-          <ToastContainer />
-        </>
-      );
-    }
-    return (
-      <>
-        <Login />
-        <ToastContainer />
-      </>
-    );
-  }
+// Login / Register: logged-in users go straight to their dashboard.
+const PublicOnly = ({ children }) => {
+  const { currentUser } = useLMS();
+  return currentUser ? <Navigate to="/dashboard" replace /> : children;
+};
 
-  // Render active main content view based on activeTab
-  const renderContentView = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        if (currentUser.role === 'teacher') return <TeacherDashboard />;
-        if (currentUser.role === 'admin') return <AdminDashboard />;
-        return <StudentDashboard />;
+// Everything inside the app shell needs a logged-in user.
+const AppLayout = () => {
+  const { currentUser } = useLMS();
 
-      case 'courses':
-        return <CourseList />;
-
-      case 'course-details':
-        return <CourseDetails />;
-
-      case 'create-course':
-        return <CourseForm />;
-
-      case 'materials':
-        return <LearningMaterials />;
-
-      case 'assignments':
-      case 'assignment-details':
-        return <AssignmentDetails />;
-
-      case 'create-assignment':
-        return <AssignmentForm />;
-
-      case 'assignment-submit':
-        return <AssignmentSubmit />;
-
-      case 'submissions':
-        return <SubmissionReview />;
-
-      case 'grades':
-        return <MyGrades />;
-
-      case 'progress':
-        return <MyProgress />;
-
-      case 'approvals':
-        return <PendingApprovals />;
-
-      case 'users':
-        return <UserManagement />;
-
-      case 'announcements':
-        return <Announcements />;
-
-      case 'profile':
-        return <Profile />;
-
-      case 'settings':
-        return <AccountSettings />;
-
-      default:
-        return <StudentDashboard />;
-    }
-  };
+  if (!currentUser) return <Navigate to="/login" replace />;
 
   return (
     <div className="flex min-h-screen bg-cream text-charcoal font-body antialiased selection:bg-gold/30">
@@ -129,29 +64,104 @@ const MainAppContent = () => {
 
       {/* 2. Center Content Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
-        {/* Top Header */}
         <Header />
-
-        {/* Dynamic Page Router */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          {renderContentView()}
+          <Outlet />
         </main>
       </div>
 
       {/* 3. Right Sidebar (Profile, Calendar, Schedule, Reminders) */}
       <RightPanel />
 
-      {/* Reusable Modals & Global Toast feedback */}
       <HelpModal />
-      <ToastContainer />
     </div>
   );
 };
 
+// Only the listed roles may open the page; everyone else goes to the dashboard.
+const RequireRole = ({ roles, children }) => {
+  const { currentUser } = useLMS();
+  return roles.includes(currentUser.role) ? children : <Navigate to="/dashboard" replace />;
+};
+
+const DashboardByRole = () => {
+  const { currentUser } = useLMS();
+  if (currentUser.role === 'teacher') return <TeacherDashboard />;
+  if (currentUser.role === 'admin') return <AdminDashboard />;
+  return <StudentDashboard />;
+};
+
+/* ---------- Routes ---------- */
+
+const AppRoutes = () => (
+  <>
+    <Routes>
+      {/* Public */}
+      {/* CHANGED: the home page now goes straight to login */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
+      <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
+
+      {/* Logged-in app */}
+      <Route element={<AppLayout />}>
+        <Route path="/dashboard" element={<DashboardByRole />} />
+
+        <Route path="/courses" element={<CourseList />} />
+        <Route path="/course-details" element={<CourseDetails />} />
+        <Route
+          path="/courses/new"
+          element={<RequireRole roles={['teacher', 'admin']}><CourseForm /></RequireRole>}
+        />
+
+        <Route path="/materials" element={<LearningMaterials />} />
+
+        <Route path="/assignments" element={<AssignmentDetails />} />
+        <Route path="/assignments/details" element={<AssignmentDetails />} />
+        <Route
+          path="/assignments/new"
+          element={<RequireRole roles={['teacher', 'admin']}><AssignmentForm /></RequireRole>}
+        />
+        <Route path="/assignments/submit" element={<AssignmentSubmit />} />
+        <Route
+          path="/submissions"
+          element={<RequireRole roles={['teacher', 'admin']}><SubmissionReview /></RequireRole>}
+        />
+
+        <Route
+          path="/grades"
+          element={<RequireRole roles={['student']}><MyGrades /></RequireRole>}
+        />
+        <Route
+          path="/progress"
+          element={<RequireRole roles={['student']}><MyProgress /></RequireRole>}
+        />
+
+        <Route
+          path="/admin/approvals"
+          element={<RequireRole roles={['admin']}><PendingApprovals /></RequireRole>}
+        />
+        <Route
+          path="/admin/users"
+          element={<RequireRole roles={['admin']}><UserManagement /></RequireRole>}
+        />
+
+        <Route path="/announcements" element={<Announcements />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<AccountSettings />} />
+
+        {/* Unknown URL */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Route>
+    </Routes>
+
+    <ToastContainer />
+  </>
+);
+
 export default function App() {
   return (
     <LMSProvider>
-      <MainAppContent />
+      <AppRoutes />
     </LMSProvider>
   );
 }

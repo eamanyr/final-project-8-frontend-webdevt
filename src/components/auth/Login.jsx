@@ -142,14 +142,14 @@ export const Login = () => {
           </div>
         </div>
 
-        {/* Register CTA */}
+        {/* Register CTA — CHANGED: new wording */}
         <div className="mt-6 text-center text-xs text-charcoal-muted">
-          New to CacheUp?{' '}
+          Don&apos;t have an account?{' '}
           <button
             onClick={() => setActiveTab('register')}
             className="font-bold text-forest hover:text-gold transition-colors underline"
           >
-            Create student account
+            Sign up
           </button>
         </div>
       </div>
