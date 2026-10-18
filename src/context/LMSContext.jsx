@@ -10,8 +10,12 @@ import {
   INITIAL_MATERIALS,
   INITIAL_ANNOUNCEMENTS,
   INITIAL_SCHEDULE,
+  INITIAL_USER_SCHEDULES,
   INITIAL_REMINDERS,
+  INITIAL_MEETINGS,
+  INITIAL_COURSE_RATINGS,
 } from '../data/mockData';
+import { getDefaultUnitLessons } from '../data/courseCurriculum';
 
 const LMSContext = createContext(null);
 
@@ -27,7 +31,29 @@ export const LMSProvider = ({ children }) => {
   // Initialize state with localStorage or defaults
   const [users, setUsers] = useState(() => {
     const saved = localStorage.getItem('cacheup_users');
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const existingIds = new Set(parsed.map((u) => u.id));
+        const missing = INITIAL_USERS.filter((u) => !existingIds.has(u.id));
+        const merged = parsed.map((u) => {
+          const init = INITIAL_USERS.find((iu) => iu.id === u.id);
+          if (init) {
+            return {
+              ...u,
+              ...init,
+              status: init.status,
+              enrolledCourseIds: init.enrolledCourseIds ?? u.enrolledCourseIds ?? [],
+            };
+          }
+          return u;
+        });
+        return [...merged, ...missing];
+      } catch {
+        return INITIAL_USERS;
+      }
+    }
+    return INITIAL_USERS;
   });
 
   // CHANGED: nobody is logged in by default
@@ -44,15 +70,29 @@ export const LMSProvider = ({ children }) => {
         const existingIds = new Set(parsed.map((c) => c.id));
         const missing = INITIAL_COURSES.filter((c) => !existingIds.has(c.id));
         const combined = [...parsed, ...missing];
-        return combined.map((c) =>
-          c.thumbnail?.includes('photo-1579783902614-a3fb3927b675')
-            ? {
-                ...c,
-                thumbnail:
-                  'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80',
-              }
-            : c
-        );
+        return combined.map((c) => {
+          const init = INITIAL_COURSES.find((ic) => ic.id === c.id);
+          const dynamicThumb = c.thumbnail?.includes('photo-1579783902614-a3fb3927b675')
+            ? 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80'
+            : c.thumbnail;
+          if (init) {
+            const syllabus = c.syllabus && c.syllabus.length ? c.syllabus : init.syllabus;
+            const totalLessons = c.totalLessons ?? (
+              syllabus ? syllabus.reduce((acc, u) => acc + (u.lessons || 0), 0) : init.totalLessons
+            );
+            return {
+              ...c,
+              thumbnail: dynamicThumb,
+              totalLessons,
+              syllabus,
+              studentsCount: init.studentsCount,
+              completedLessons: c.completedLessons ?? init.completedLessons,
+              progress: c.progress ?? init.progress,
+              customLessons: c.customLessons || {},
+            };
+          }
+          return { ...c, thumbnail: dynamicThumb };
+        });
       } catch {
         return INITIAL_COURSES;
       }
@@ -77,7 +117,17 @@ export const LMSProvider = ({ children }) => {
 
   const [submissions, setSubmissions] = useState(() => {
     const saved = localStorage.getItem('cacheup_submissions');
-    return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const existingIds = new Set(parsed.map((s) => s.id));
+        const missing = INITIAL_SUBMISSIONS.filter((s) => !existingIds.has(s.id));
+        return [...parsed, ...missing];
+      } catch {
+        return INITIAL_SUBMISSIONS;
+      }
+    }
+    return INITIAL_SUBMISSIONS;
   });
 
   const [materials, setMaterials] = useState(() => {
@@ -100,49 +150,111 @@ export const LMSProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : INITIAL_ANNOUNCEMENTS;
   });
 
-  const [schedule, setSchedule] = useState(() => {
-    const saved = localStorage.getItem('cacheup_schedule');
+  const [customLessons, setCustomLessons] = useState(() => {
+    const saved = localStorage.getItem('cacheup_custom_lessons');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  });
+
+  // Per-user schedules dictionary
+  const [userSchedules, setUserSchedules] = useState(() => {
+    const saved = localStorage.getItem('cacheup_user_schedules');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.some((item) => item.startTime || item.days)) {
-          return parsed.map((item) => {
-            if (item.id === 'sch-5') {
-              return { ...item, courseId: 'crs-5', course: 'Fine Arts Portfolio Seminar' };
-            }
-            if (item.id === 'sch-6') {
-              return {
-                ...item,
-                courseId: 'crs-6',
-                course: 'Digital Figure Illustration Lab',
-                days: Array.isArray(item.days) && item.days.includes('Sunday') ? item.days : ['Saturday', 'Sunday'],
-                day: 'Sat, Sun'
-              };
-            }
-            if (item.id === 'sch-3' && Array.isArray(item.days) && item.days.length === 1 && item.days[0] === 'Thursday') {
-              return { ...item, days: ['Tuesday', 'Thursday'], day: 'Tue, Thu' };
-            }
-            return item;
-          });
-        }
+        // Administrators do not have class schedules
+        parsed['usr-5'] = {
+          title: 'Marcus Vance — Academic Administration (No Class Schedules)',
+          items: [],
+        };
+        return {
+          ...INITIAL_USER_SCHEDULES,
+          ...parsed,
+          'usr-5': {
+            title: 'Marcus Vance — Academic Administration (No Class Schedules)',
+            items: [],
+          },
+        };
       } catch {
-        // Fallback to INITIAL_SCHEDULE
+        return INITIAL_USER_SCHEDULES;
       }
     }
-    return INITIAL_SCHEDULE;
+    return INITIAL_USER_SCHEDULES;
   });
 
-  const [scheduleTitle, setScheduleTitle] = useState(() => {
-    return (
-      localStorage.getItem('cacheup_schedule_title') ||
-      '1st Semester Studio & Lecture Schedule'
-    );
-  });
+  useEffect(() => {
+    localStorage.setItem('cacheup_user_schedules', JSON.stringify(userSchedules));
+  }, [userSchedules]);
+
+  // Active user's personalized schedule and title (admins do not have class schedules)
+  const currentUserId = currentUser?.id || 'usr-1';
+  const isAdmin = currentUser?.role === 'admin';
+  const currentUserSchedule = isAdmin
+    ? {
+        title: `${currentUser?.name || 'Administrator'} — Academic Administration (No Class Schedules)`,
+        items: [],
+      }
+    : userSchedules[currentUserId] ||
+      INITIAL_USER_SCHEDULES[currentUserId] || {
+        title: `${currentUser?.name || 'Student'} — Weekly Studio Schedule`,
+        items: [],
+      };
+
+  const schedule = isAdmin ? [] : (currentUserSchedule.items || []);
+  const scheduleTitle =
+    currentUserSchedule.title ||
+    `${currentUser?.name || 'Student'} — Weekly Studio Schedule`;
 
   const [reminders, setReminders] = useState(() => {
     const saved = localStorage.getItem('cacheup_reminders');
     return saved ? JSON.parse(saved) : INITIAL_REMINDERS;
   });
+
+  const [courseMeetings, setCourseMeetings] = useState(() => {
+    const saved = localStorage.getItem('cacheup_course_meetings');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const merged = { ...INITIAL_MEETINGS, ...parsed };
+        Object.keys(merged).forEach((courseId) => {
+          if (!merged[courseId].date) {
+            merged[courseId].date = INITIAL_MEETINGS[courseId]?.date || '2026-10-19';
+          }
+        });
+        return merged;
+      } catch {
+        return INITIAL_MEETINGS;
+      }
+    }
+    return INITIAL_MEETINGS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_course_meetings', JSON.stringify(courseMeetings));
+  }, [courseMeetings]);
+
+  const [courseRatings, setCourseRatings] = useState(() => {
+    const saved = localStorage.getItem('cacheup_course_ratings');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return { ...INITIAL_COURSE_RATINGS, ...parsed };
+      } catch {
+        return INITIAL_COURSE_RATINGS;
+      }
+    }
+    return INITIAL_COURSE_RATINGS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_course_ratings', JSON.stringify(courseRatings));
+  }, [courseRatings]);
 
   // Navigation and UI state
   // CHANGED: the active page now comes from the URL
@@ -262,6 +374,10 @@ export const LMSProvider = ({ children }) => {
     localStorage.setItem('cacheup_schedule', JSON.stringify(schedule));
   }, [schedule]);
 
+  useEffect(() => {
+    localStorage.setItem('cacheup_custom_lessons', JSON.stringify(customLessons));
+  }, [customLessons]);
+
   // Toast Notification helper
   const addToast = (message, type = 'success') => {
     const id = Date.now().toString();
@@ -298,7 +414,13 @@ export const LMSProvider = ({ children }) => {
     }
     setCurrentUser(found);
     setActiveTab('dashboard', found);
-    addToast(`Welcome back, ${found.name}!`, 'success');
+    const teacherFirstName = found.name.replace(/^Prof\.\s*/i, '').trim().split(' ')[0];
+    addToast(
+      found.role === 'teacher'
+        ? `Hello Prof. ${teacherFirstName}!`
+        : `Welcome back, ${found.name}!`,
+      'success'
+    );
     return true;
   };
 
@@ -322,6 +444,15 @@ export const LMSProvider = ({ children }) => {
       setCurrentUser(target);
       setActiveTab('dashboard', target);
       addToast(`Switched active persona to ${target.name} (${target.role.toUpperCase()})`, 'info');
+    }
+  };
+
+  // Switch to specific user account by ID
+  const switchUserById = (userId) => {
+    const target = users.find((u) => u.id === userId);
+    if (target) {
+      setCurrentUser(target);
+      addToast(`Switched active user to ${target.name} (${target.role.toUpperCase()})`, 'info');
     }
   };
 
@@ -442,6 +573,319 @@ export const LMSProvider = ({ children }) => {
     addToast('Course deleted.', 'info');
   };
 
+  // Lesson Management within Course Units
+  const getUnitLessonList = (courseId, unitIdx) => {
+    const numUnitIdx = Number(unitIdx);
+    const courseLessons = customLessons[courseId] || {};
+    if (
+      courseLessons[numUnitIdx] &&
+      Array.isArray(courseLessons[numUnitIdx]) &&
+      courseLessons[numUnitIdx].length > 0
+    ) {
+      return [...courseLessons[numUnitIdx]];
+    }
+    const course = courses.find((c) => c.id === courseId);
+    return getDefaultUnitLessons(course, numUnitIdx);
+  };
+
+  const addLessonToCourseUnit = (courseId, unitIdx, lessonData) => {
+    const numUnitIdx = Number(unitIdx);
+    const currentList = getUnitLessonList(courseId, numUnitIdx);
+    const lessonId = `${courseId}-u${numUnitIdx + 1}-l${Date.now()}`;
+    const newLesson = {
+      id: lessonId,
+      courseId,
+      unitIdx: numUnitIdx,
+      title: lessonData.title,
+      topicHeading: lessonData.topicHeading || lessonData.title,
+      definition:
+        lessonData.definition ||
+        'Detailed studio instructional guide, technical fundamentals, and hands-on exercises.',
+      majorFunctionsTitle:
+        lessonData.majorFunctionsTitle || 'Key learning objectives for this lesson:',
+      majorFunctions:
+        Array.isArray(lessonData.majorFunctions) && lessonData.majorFunctions.length
+          ? lessonData.majorFunctions
+          : [
+              'Analyze foundational principles and contemporary design theory.',
+              'Apply techniques through structured hands-on studio iterations.',
+              'Engage in peer critique and document comprehensive design rationale.',
+            ],
+      partsTitle:
+        lessonData.partsTitle || 'Core Components & Technical Terminology',
+      parts:
+        Array.isArray(lessonData.parts) && lessonData.parts.length
+          ? lessonData.parts
+          : [
+              {
+                term: 'Theoretical Foundation',
+                desc: 'Primary conceptual principle and studio background methodology.',
+              },
+              {
+                term: 'Practical Studio Execution',
+                desc: 'Step-by-step production method and portfolio deliverable.',
+              },
+            ],
+      diagram: lessonData.diagram || {
+        top: 'Visual Brief & Initial Concept',
+        middle1: 'Iterative Exploration & Rapid Prototyping',
+        middle2: 'Faculty Review & Structured Critique',
+        bottom: 'Final Production Milestone & Unit Deliverable',
+      },
+      isCustom: true,
+      createdAt: new Date().toISOString(),
+      authorName: currentUser?.name || 'Course Instructor',
+    };
+
+    const updatedList = [...currentList, newLesson];
+
+    setCustomLessons((prev) => ({
+      ...prev,
+      [courseId]: {
+        ...(prev[courseId] || {}),
+        [numUnitIdx]: updatedList,
+      },
+    }));
+
+    setCourses((prev) =>
+      prev.map((c) => {
+        if (c.id !== courseId) return c;
+        const currentSyllabus = c.syllabus || [
+          { unit: 'Unit 1', title: 'Course Orientation & Fundamentals', lessons: 3 },
+          { unit: 'Unit 2', title: 'Hands-on Exercises & Studio Critique', lessons: 3 },
+          { unit: 'Unit 3', title: 'Capstone Project & Final Assessment', lessons: 3 },
+        ];
+        const updatedSyllabus = currentSyllabus.map((u, idx) => {
+          if (idx === numUnitIdx) {
+            return { ...u, lessons: updatedList.length };
+          }
+          return u;
+        });
+        const currentCustomLessons = c.customLessons || {};
+        return {
+          ...c,
+          syllabus: updatedSyllabus,
+          totalLessons: updatedSyllabus.reduce((acc, u) => acc + (u.lessons || 0), 0),
+          customLessons: {
+            ...currentCustomLessons,
+            [numUnitIdx]: updatedList,
+          },
+        };
+      })
+    );
+
+    addToast(`Lesson "${newLesson.title}" added to Unit ${numUnitIdx + 1}!`, 'success');
+    return newLesson;
+  };
+
+  const updateLessonInCourseUnit = (courseId, unitIdx, lessonId, updatedLessonData) => {
+    const numUnitIdx = Number(unitIdx);
+    const currentList = getUnitLessonList(courseId, numUnitIdx);
+    const updatedList = currentList.map((les) =>
+      les.id === lessonId ? { ...les, ...updatedLessonData } : les
+    );
+
+    setCustomLessons((prev) => ({
+      ...prev,
+      [courseId]: {
+        ...(prev[courseId] || {}),
+        [numUnitIdx]: updatedList,
+      },
+    }));
+
+    setCourses((prev) =>
+      prev.map((c) => {
+        if (c.id !== courseId) return c;
+        const currentCustomLessons = c.customLessons || {};
+        return {
+          ...c,
+          customLessons: {
+            ...currentCustomLessons,
+            [numUnitIdx]: updatedList,
+          },
+        };
+      })
+    );
+
+    addToast(`Lesson "${updatedLessonData.title || 'Lesson'}" updated!`, 'success');
+  };
+
+  const reorderLessonsInCourseUnit = (courseId, unitIdx, lessonId, direction) => {
+    const numUnitIdx = Number(unitIdx);
+    const currentList = getUnitLessonList(courseId, numUnitIdx);
+    const idx = currentList.findIndex((l) => l.id === lessonId);
+    if (idx === -1) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= currentList.length) return;
+
+    const copy = [...currentList];
+    const temp = copy[idx];
+    copy[idx] = copy[targetIdx];
+    copy[targetIdx] = temp;
+
+    setCustomLessons((prev) => ({
+      ...prev,
+      [courseId]: {
+        ...(prev[courseId] || {}),
+        [numUnitIdx]: copy,
+      },
+    }));
+
+    setCourses((prev) =>
+      prev.map((c) => {
+        if (c.id !== courseId) return c;
+        const currentCustomLessons = c.customLessons || {};
+        return {
+          ...c,
+          customLessons: {
+            ...currentCustomLessons,
+            [numUnitIdx]: copy,
+          },
+        };
+      })
+    );
+
+    addToast('Lesson order updated!', 'success');
+  };
+
+  const moveLesson = (courseId, fromUnitIdx, fromIndex, toUnitIdx, toIndex) => {
+    const numFromUnit = Number(fromUnitIdx);
+    const numToUnit = Number(toUnitIdx);
+    const course = courses.find((c) => c.id === courseId);
+    if (!course) return;
+
+    if (numFromUnit === numToUnit) {
+      const currentList = getUnitLessonList(courseId, numFromUnit);
+      if (
+        fromIndex < 0 ||
+        fromIndex >= currentList.length ||
+        toIndex < 0 ||
+        toIndex >= currentList.length ||
+        fromIndex === toIndex
+      ) {
+        return;
+      }
+      const copy = [...currentList];
+      const [moved] = copy.splice(fromIndex, 1);
+      copy.splice(toIndex, 0, moved);
+
+      setCustomLessons((prev) => ({
+        ...prev,
+        [courseId]: {
+          ...(prev[courseId] || {}),
+          [numFromUnit]: copy,
+        },
+      }));
+
+      setCourses((prev) =>
+        prev.map((c) => {
+          if (c.id !== courseId) return c;
+          const currentCustomLessons = c.customLessons || {};
+          return {
+            ...c,
+            customLessons: {
+              ...currentCustomLessons,
+              [numFromUnit]: copy,
+            },
+          };
+        })
+      );
+      addToast(`Lesson "${moved.title}" moved to position ${toIndex + 1}!`, 'success');
+      return;
+    }
+
+    // Moving between different units
+    const fromList = getUnitLessonList(courseId, numFromUnit);
+    const toList = getUnitLessonList(courseId, numToUnit);
+    if (fromIndex < 0 || fromIndex >= fromList.length) return;
+
+    const fromCopy = [...fromList];
+    const [moved] = fromCopy.splice(fromIndex, 1);
+    const toCopy = [...toList];
+    const safeToIndex = Math.max(0, Math.min(toIndex, toCopy.length));
+    const updatedMoved = {
+      ...moved,
+      unitIdx: numToUnit,
+      unitLabel: `Unit ${numToUnit + 1}`,
+    };
+    toCopy.splice(safeToIndex, 0, updatedMoved);
+
+    setCustomLessons((prev) => ({
+      ...prev,
+      [courseId]: {
+        ...(prev[courseId] || {}),
+        [numFromUnit]: fromCopy,
+        [numToUnit]: toCopy,
+      },
+    }));
+
+    setCourses((prev) =>
+      prev.map((c) => {
+        if (c.id !== courseId) return c;
+        const currentCustomLessons = c.customLessons || {};
+        const currentSyllabus = c.syllabus || [];
+        const updatedSyllabus = currentSyllabus.map((u, idx) => {
+          if (idx === numFromUnit) return { ...u, lessons: fromCopy.length };
+          if (idx === numToUnit) return { ...u, lessons: toCopy.length };
+          return u;
+        });
+        return {
+          ...c,
+          syllabus: updatedSyllabus,
+          customLessons: {
+            ...currentCustomLessons,
+            [numFromUnit]: fromCopy,
+            [numToUnit]: toCopy,
+          },
+        };
+      })
+    );
+    addToast(`Moved "${moved.title}" to Unit ${numToUnit + 1}!`, 'success');
+  };
+
+  const moveLessonToIndex = (courseId, unitIdx, fromIndex, toIndex) => {
+    moveLesson(courseId, unitIdx, fromIndex, unitIdx, toIndex);
+  };
+
+  const deleteLessonFromCourseUnit = (courseId, unitIdx, lessonId) => {
+    const numUnitIdx = Number(unitIdx);
+    const currentList = getUnitLessonList(courseId, numUnitIdx);
+    const updatedList = currentList.filter((l) => l.id !== lessonId);
+
+    setCustomLessons((prev) => ({
+      ...prev,
+      [courseId]: {
+        ...(prev[courseId] || {}),
+        [numUnitIdx]: updatedList,
+      },
+    }));
+
+    setCourses((prev) =>
+      prev.map((c) => {
+        if (c.id !== courseId) return c;
+        const currentSyllabus = c.syllabus || [];
+        const updatedSyllabus = currentSyllabus.map((u, idx) => {
+          if (idx === numUnitIdx) {
+            return { ...u, lessons: updatedList.length };
+          }
+          return u;
+        });
+        const currentCustomLessons = c.customLessons || {};
+        return {
+          ...c,
+          syllabus: updatedSyllabus,
+          totalLessons: updatedSyllabus.reduce((acc, u) => acc + (u.lessons || 0), 0),
+          customLessons: {
+            ...currentCustomLessons,
+            [numUnitIdx]: updatedList,
+          },
+        };
+      })
+    );
+
+    addToast('Lesson removed from unit.', 'info');
+  };
+
   const toggleEnrollCourse = (courseId) => {
     if (!currentUser) return;
     const isEnrolled = currentUser.enrolledCourseIds?.includes(courseId);
@@ -464,10 +908,14 @@ export const LMSProvider = ({ children }) => {
     const newAsg = {
       id: `asg-${Date.now()}`,
       courseId: data.courseId,
-      courseName: course ? course.title : 'General Course',
+      courseName: course ? course.title : (data.courseName || 'General Course'),
+      unitIdx:
+        data.unitIdx !== undefined && data.unitIdx !== '' && data.unitIdx !== 'all'
+          ? Number(data.unitIdx)
+          : undefined,
       title: data.title,
-      description: data.description,
-      dueDate: data.dueDate,
+      description: data.description || 'Complete the assigned task and submit your work.',
+      dueDate: data.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
       dueTime: data.dueTime || '11:59 PM',
       duration: data.duration || '2 hours',
       maxScore: parseInt(data.maxScore) || 100,
@@ -485,14 +933,105 @@ export const LMSProvider = ({ children }) => {
 
   const updateAssignment = (id, data) => {
     setAssignments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, ...data } : a))
+      prev.map((a) => {
+        if (a.id !== id) return a;
+        const updatedCourse = data.courseId ? courses.find((c) => c.id === data.courseId) : null;
+        return {
+          ...a,
+          ...data,
+          courseName: updatedCourse ? updatedCourse.title : a.courseName,
+          unitIdx:
+            data.unitIdx !== undefined
+              ? (data.unitIdx === '' || data.unitIdx === 'all' ? undefined : Number(data.unitIdx))
+              : a.unitIdx,
+          priorityColor:
+            (data.priority || a.priority) === 'High'
+              ? 'gold'
+              : (data.priority || a.priority) === 'Low'
+              ? 'sage'
+              : 'forest',
+        };
+      })
     );
-    addToast('Assignment updated.', 'success');
+    addToast('Assignment updated successfully.', 'success');
   };
 
   const deleteAssignment = (id) => {
     setAssignments((prev) => prev.filter((a) => a.id !== id));
+    setSubmissions((prev) => prev.filter((s) => s.assignmentId !== id));
     addToast('Assignment removed.', 'info');
+  };
+
+  const reorderAssignmentInUnit = (courseId, unitIdx, assignmentId, direction) => {
+    const numUnitIdx = Number(unitIdx);
+    setAssignments((prev) => {
+      const course = courses.find((c) => c.id === courseId);
+      const sylLen = course?.syllabus?.length || 3;
+      const unitAsgs = prev.filter(
+        (a, idx) =>
+          a.courseId === courseId &&
+          (a.unitIdx !== undefined ? a.unitIdx === numUnitIdx : (idx % sylLen === numUnitIdx))
+      );
+      const curIdx = unitAsgs.findIndex((a) => a.id === assignmentId);
+      if (curIdx === -1) return prev;
+      const targetIdx = direction === 'up' ? curIdx - 1 : curIdx + 1;
+      if (targetIdx < 0 || targetIdx >= unitAsgs.length) return prev;
+
+      const itemA = unitAsgs[curIdx];
+      const itemB = unitAsgs[targetIdx];
+      const posA = prev.findIndex((a) => a.id === itemA.id);
+      const posB = prev.findIndex((a) => a.id === itemB.id);
+      if (posA === -1 || posB === -1) return prev;
+
+      const copy = [...prev];
+      copy[posA] = itemB;
+      copy[posB] = itemA;
+      return copy;
+    });
+    addToast('Assignment arrangement updated!', 'success');
+  };
+
+  const moveAssignment = (courseId, fromUnitIdx, fromIndex, toUnitIdx, toIndex) => {
+    const numFromUnit = Number(fromUnitIdx);
+    const numToUnit = Number(toUnitIdx);
+
+    setAssignments((prev) => {
+      const course = courses.find((c) => c.id === courseId);
+      const sylLen = course?.syllabus?.length || 3;
+      const fromAsgs = prev.filter(
+        (a, idx) =>
+          a.courseId === courseId &&
+          (a.unitIdx !== undefined ? a.unitIdx === numFromUnit : (idx % sylLen === numFromUnit))
+      );
+      if (fromIndex < 0 || fromIndex >= fromAsgs.length) return prev;
+      const movedItem = fromAsgs[fromIndex];
+      const fromPos = prev.findIndex((a) => a.id === movedItem.id);
+      if (fromPos === -1) return prev;
+
+      const copy = [...prev];
+      const [moved] = copy.splice(fromPos, 1);
+      const updatedMoved = { ...moved, unitIdx: numToUnit };
+
+      const toAsgs = copy.filter(
+        (a, idx) =>
+          a.courseId === courseId &&
+          (a.unitIdx !== undefined ? a.unitIdx === numToUnit : (idx % sylLen === numToUnit))
+      );
+      const safeToIndex = Math.max(0, Math.min(toIndex, toAsgs.length));
+      if (toAsgs.length === 0 || safeToIndex >= toAsgs.length) {
+        copy.push(updatedMoved);
+      } else {
+        const targetItem = toAsgs[safeToIndex];
+        const toPos = copy.findIndex((a) => a.id === targetItem.id);
+        copy.splice(toPos, 0, updatedMoved);
+      }
+      return copy;
+    });
+    addToast('Assignment arrangement updated!', 'success');
+  };
+
+  const moveAssignmentToIndex = (courseId, unitIdx, fromIndex, toIndex) => {
+    moveAssignment(courseId, unitIdx, fromIndex, unitIdx, toIndex);
   };
 
   // Submission & Grading actions
@@ -549,22 +1088,116 @@ export const LMSProvider = ({ children }) => {
     const newMat = {
       id: `mat-${Date.now()}`,
       courseId: data.courseId,
-      courseTitle: course ? course.title : 'Course Material',
+      courseTitle: course ? course.title : (data.courseTitle || 'Course Material'),
       title: data.title,
       type: data.type || 'pdf',
       size: data.size || '4.5 MB',
       uploadDate: new Date().toISOString().slice(0, 10),
       uploadedBy: currentUser?.name || 'Instructor',
       downloadUrl: data.downloadUrl || '#',
-      description: data.description || 'Uploaded study resource for CacheUp students.'
+      description: data.description || 'Uploaded study resource for CacheUp students.',
+      unitIdx:
+        data.unitIdx !== undefined && data.unitIdx !== '' && data.unitIdx !== 'all'
+          ? Number(data.unitIdx)
+          : undefined,
     };
     setMaterials((prev) => [newMat, ...prev]);
     addToast(`Material "${newMat.title}" added to course resources!`, 'success');
+    return newMat;
   };
 
   const deleteMaterial = (id) => {
     setMaterials((prev) => prev.filter((m) => m.id !== id));
     addToast('Learning material removed.', 'info');
+  };
+
+  const updateMaterial = (id, data) => {
+    setMaterials((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        return {
+          ...m,
+          ...data,
+          unitIdx:
+            data.unitIdx !== undefined
+              ? (data.unitIdx === '' || data.unitIdx === 'all' ? undefined : Number(data.unitIdx))
+              : m.unitIdx,
+        };
+      })
+    );
+    addToast('Learning material updated.', 'success');
+  };
+
+  const reorderMaterialInUnit = (courseId, unitIdx, materialId, direction) => {
+    const numUnitIdx = Number(unitIdx);
+    setMaterials((prev) => {
+      const course = courses.find((c) => c.id === courseId);
+      const sylLen = course?.syllabus?.length || 3;
+      const unitMats = prev.filter(
+        (m, idx) =>
+          m.courseId === courseId &&
+          (m.unitIdx !== undefined ? m.unitIdx === numUnitIdx : (idx % sylLen === numUnitIdx))
+      );
+      const curIdx = unitMats.findIndex((m) => m.id === materialId);
+      if (curIdx === -1) return prev;
+      const targetIdx = direction === 'up' ? curIdx - 1 : curIdx + 1;
+      if (targetIdx < 0 || targetIdx >= unitMats.length) return prev;
+
+      const itemA = unitMats[curIdx];
+      const itemB = unitMats[targetIdx];
+      const posA = prev.findIndex((m) => m.id === itemA.id);
+      const posB = prev.findIndex((m) => m.id === itemB.id);
+      if (posA === -1 || posB === -1) return prev;
+
+      const copy = [...prev];
+      copy[posA] = itemB;
+      copy[posB] = itemA;
+      return copy;
+    });
+    addToast('Material arrangement updated!', 'success');
+  };
+
+  const moveMaterial = (courseId, fromUnitIdx, fromIndex, toUnitIdx, toIndex) => {
+    const numFromUnit = Number(fromUnitIdx);
+    const numToUnit = Number(toUnitIdx);
+
+    setMaterials((prev) => {
+      const course = courses.find((c) => c.id === courseId);
+      const sylLen = course?.syllabus?.length || 3;
+      const fromMats = prev.filter(
+        (m, idx) =>
+          m.courseId === courseId &&
+          (m.unitIdx !== undefined ? m.unitIdx === numFromUnit : (idx % sylLen === numFromUnit))
+      );
+      if (fromIndex < 0 || fromIndex >= fromMats.length) return prev;
+      const movedItem = fromMats[fromIndex];
+      const fromPos = prev.findIndex((m) => m.id === movedItem.id);
+      if (fromPos === -1) return prev;
+
+      const copy = [...prev];
+      const [moved] = copy.splice(fromPos, 1);
+      const updatedMoved = { ...moved, unitIdx: numToUnit };
+
+      const toMats = copy.filter(
+        (m, idx) =>
+          m.courseId === courseId &&
+          (m.unitIdx !== undefined ? m.unitIdx === numToUnit : (idx % sylLen === numToUnit))
+      );
+      const safeToIndex = Math.max(0, Math.min(toIndex, toMats.length));
+      if (toMats.length === 0 || safeToIndex >= toMats.length) {
+        copy.push(updatedMoved);
+      } else {
+        const targetItem = toMats[safeToIndex];
+        const toPos = copy.findIndex((m) => m.id === targetItem.id);
+        copy.splice(toPos, 0, updatedMoved);
+      }
+      return copy;
+    });
+    addToast('Material arrangement updated!', 'success');
+  };
+
+  const moveMaterialToIndex = (courseId, unitIdx, fromIndex, toIndex) => {
+    moveMaterial(courseId, unitIdx, fromIndex, unitIdx, toIndex);
   };
 
   // Announcements actions
@@ -619,13 +1252,39 @@ export const LMSProvider = ({ children }) => {
     addToast('Comment posted to announcement!', 'success');
   };
 
-  // Schedule actions
+  // Schedule actions (scoped to active user)
+  const setScheduleTitle = (newTitle) => {
+    setUserSchedules((prev) => ({
+      ...prev,
+      [currentUserId]: {
+        ...(prev[currentUserId] || currentUserSchedule),
+        title: newTitle,
+      },
+    }));
+  };
+
+  const setSchedule = (updater) => {
+    setUserSchedules((prev) => {
+      const currentEntry = prev[currentUserId] || currentUserSchedule;
+      const currentItems = currentEntry.items || [];
+      const newItems = typeof updater === 'function' ? updater(currentItems) : updater;
+      return {
+        ...prev,
+        [currentUserId]: {
+          ...currentEntry,
+          items: newItems,
+        },
+      };
+    });
+  };
+
   const addScheduleItem = (data) => {
     const days = Array.isArray(data.days) && data.days.length > 0 ? data.days : [data.day || 'Monday'];
     const newItem = {
       id: `sch-${Date.now()}`,
       code: data.code || 'CRS-101',
-      title: data.title,
+      title: data.title || 'Studio Session',
+      courseId: data.courseId || 'crs-1',
       course: data.course || data.title || 'General Studio',
       days,
       day: days.join(', '),
@@ -634,39 +1293,168 @@ export const LMSProvider = ({ children }) => {
       time: data.time || `${data.startTime || '09:00'} - ${data.endTime || '10:30'}`,
       date: data.date || '2026-10-19',
       color: data.color || 'sage',
-      instructor: data.instructor || 'Prof. Alicia Mayer',
+      instructor: data.instructor || currentUser?.name || 'Prof. Alicia Mayer',
       location: data.location || 'Studio Lab A',
     };
-    setSchedule((prev) => [...prev, newItem]);
+    setUserSchedules((prev) => {
+      const currentEntry = prev[currentUserId] || currentUserSchedule;
+      const currentItems = currentEntry.items || [];
+      return {
+        ...prev,
+        [currentUserId]: {
+          ...currentEntry,
+          items: [...currentItems, newItem],
+        },
+      };
+    });
     addToast(`Added "${newItem.code || newItem.title}" to your weekly schedule!`, 'success');
   };
 
   const updateScheduleItem = (id, data) => {
     const days = Array.isArray(data.days) && data.days.length > 0 ? data.days : [data.day || 'Monday'];
-    setSchedule((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              ...data,
-              days,
-              day: days.join(', '),
-              time: data.time || `${data.startTime || item.startTime} - ${data.endTime || item.endTime}`,
-            }
-          : item
-      )
-    );
+    setUserSchedules((prev) => {
+      const currentEntry = prev[currentUserId] || currentUserSchedule;
+      const currentItems = currentEntry.items || [];
+      return {
+        ...prev,
+        [currentUserId]: {
+          ...currentEntry,
+          items: currentItems.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  ...data,
+                  days,
+                  day: days.join(', '),
+                  time: data.time || `${data.startTime || item.startTime} - ${data.endTime || item.endTime}`,
+                }
+              : item
+          ),
+        },
+      };
+    });
     addToast('Schedule session updated!', 'success');
   };
 
   const deleteScheduleItem = (id) => {
-    setSchedule((prev) => prev.filter((item) => item.id !== id));
+    setUserSchedules((prev) => {
+      const currentEntry = prev[currentUserId] || currentUserSchedule;
+      const currentItems = currentEntry.items || [];
+      return {
+        ...prev,
+        [currentUserId]: {
+          ...currentEntry,
+          items: currentItems.filter((item) => item.id !== id),
+        },
+      };
+    });
     addToast('Session removed from schedule.', 'info');
   };
 
-  useEffect(() => {
-    localStorage.setItem('cacheup_schedule_title', scheduleTitle);
-  }, [scheduleTitle]);
+  const saveCourseMeeting = (courseId, meetingData) => {
+    setCourseMeetings((prev) => ({
+      ...prev,
+      [courseId]: {
+        ...prev[courseId],
+        ...meetingData,
+        courseId,
+        id: prev[courseId]?.id || `meet-${courseId}-${Date.now()}`,
+        updatedAt: new Date().toISOString(),
+      },
+    }));
+    addToast('Google Meet class details saved successfully!', 'success');
+  };
+
+  const removeCourseMeeting = (courseId) => {
+    setCourseMeetings((prev) => {
+      const copy = { ...prev };
+      delete copy[courseId];
+      return copy;
+    });
+    addToast('Live meeting cancelled and removed.', 'info');
+  };
+
+  const rateCourse = (courseId, { rating, review, tags }) => {
+    const student = currentUser || { id: 'usr-1', name: 'Stella Walton' };
+    const numRating = Number(rating) || 5;
+    const newRating = {
+      id: `rat-${Date.now()}`,
+      courseId,
+      studentId: student.id,
+      studentName: student.name,
+      studentAvatar:
+        student.avatar ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      rating: numRating,
+      review: (review || '').trim(),
+      tags: tags || [],
+      date: new Date().toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }),
+    };
+
+    let updatedRatingsForCourse = [];
+    setCourseRatings((prev) => {
+      const existing = prev[courseId] || [];
+      const filtered = existing.filter((r) => r.studentId !== student.id);
+      updatedRatingsForCourse = [newRating, ...filtered];
+      return {
+        ...prev,
+        [courseId]: updatedRatingsForCourse,
+      };
+    });
+
+    // Also update course progress to 100% and recalculate average rating
+    setCourses((prevCourses) =>
+      prevCourses.map((c) => {
+        if (c.id === courseId) {
+          const allRatings = updatedRatingsForCourse.length
+            ? updatedRatingsForCourse
+            : [newRating];
+          const avg = (
+            allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length
+          ).toFixed(1);
+
+          return {
+            ...c,
+            rating: parseFloat(avg),
+            progress: 100,
+            completedLessons: c.totalLessons,
+          };
+        }
+        return c;
+      })
+    );
+
+    // Reward student with 50 XP points
+    if (student.id) {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === student.id ? { ...u, points: (u.points || 0) + 50 } : u
+        )
+      );
+      if (currentUser?.id === student.id) {
+        setCurrentUser((prev) =>
+          prev ? { ...prev, points: (prev.points || 0) + 50 } : prev
+        );
+      }
+    }
+
+    addToast(`⭐ Thank you! Your review for this course was saved (+50 XP).`, 'success');
+  };
+
+  const markCourseComplete = (courseId) => {
+    setCourses((prev) =>
+      prev.map((c) =>
+        c.id === courseId
+          ? { ...c, progress: 100, completedLessons: c.totalLessons }
+          : c
+      )
+    );
+    addToast('🎉 Congratulations! Course marked as completed. You can now rate it!', 'success');
+  };
 
   // Reset demo data to initial defaults
   const resetDemoData = () => {
@@ -678,15 +1466,27 @@ export const LMSProvider = ({ children }) => {
     setSubmissions(INITIAL_SUBMISSIONS);
     setMaterials(INITIAL_MATERIALS);
     setAnnouncements(INITIAL_ANNOUNCEMENTS);
-    setSchedule(INITIAL_SCHEDULE);
+    setUserSchedules(INITIAL_USER_SCHEDULES);
     setReminders(INITIAL_REMINDERS);
+    setCourseMeetings(INITIAL_MEETINGS);
+    setCourseRatings(INITIAL_COURSE_RATINGS);
+    setCustomLessons({});
     setActiveTab('dashboard');
     addToast('System reset to original fresh demo state!', 'info');
   };
 
   // Helper counts
   const pendingApprovalsCount = users.filter((u) => u.status === 'pending').length;
-  const pendingGradingCount = submissions.filter((s) => s.status === 'Submitted').length;
+  const teacherCourseIds = currentUser?.role === 'teacher'
+    ? new Set(
+        courses
+          .filter((c) => c.instructorId === currentUser.id || currentUser.assignedCourseIds?.includes(c.id))
+          .map((c) => c.id)
+      )
+    : null;
+  const pendingGradingCount = teacherCourseIds
+    ? submissions.filter((s) => s.status === 'Submitted' && teacherCourseIds.has(s.courseId)).length
+    : submissions.filter((s) => s.status === 'Submitted').length;
   const unreadAnnouncementsCount = announcements.filter((a) => !a.isRead).length;
 
   return (
@@ -698,6 +1498,7 @@ export const LMSProvider = ({ children }) => {
         login,
         logout,
         switchDemoUser,
+        switchUserById,
         registerStudent,
         approveUser,
         rejectUser,
@@ -707,6 +1508,7 @@ export const LMSProvider = ({ children }) => {
 
         // Data
         courses,
+        customLessons,
         assignments,
         submissions,
         materials,
@@ -714,24 +1516,45 @@ export const LMSProvider = ({ children }) => {
         schedule,
         scheduleTitle,
         setScheduleTitle,
+        setSchedule,
+        userSchedules,
         reminders,
+        courseMeetings,
+        saveCourseMeeting,
+        removeCourseMeeting,
+        courseRatings,
+        rateCourse,
+        markCourseComplete,
 
         // Course management
         addCourse,
         updateCourse,
         deleteCourse,
         toggleEnrollCourse,
+        addLessonToCourseUnit,
+        updateLessonInCourseUnit,
+        deleteLessonFromCourseUnit,
+        reorderLessonsInCourseUnit,
+        moveLesson,
+        moveLessonToIndex,
 
         // Assignment & Submission management
         addAssignment,
         updateAssignment,
         deleteAssignment,
+        reorderAssignmentInUnit,
+        moveAssignment,
+        moveAssignmentToIndex,
         submitAssignment,
         gradeSubmission,
 
         // Materials, Announcements & Schedule
         addMaterial,
+        updateMaterial,
         deleteMaterial,
+        reorderMaterialInUnit,
+        moveMaterial,
+        moveMaterialToIndex,
         addAnnouncement,
         markAnnouncementAsRead,
         deleteAnnouncement,

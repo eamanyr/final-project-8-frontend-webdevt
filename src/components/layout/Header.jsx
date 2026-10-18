@@ -36,7 +36,9 @@ export const Header = () => {
 
   if (!currentUser) return null;
 
-  const firstName = currentUser.name.split(' ')[0];
+  const cleanName = (currentUser.name || '').replace(/^Prof\.\s*/i, '').trim();
+  const firstName = cleanName.split(' ')[0] || currentUser.name;
+  const greetingName = currentUser.role === 'teacher' ? `Prof. ${firstName}` : firstName;
 
   return (
     <header className="sticky top-0 z-30 bg-cream/90 backdrop-blur-md border-b border-charcoal/10 px-4 lg:px-8 py-3.5 transition-all">
@@ -54,7 +56,7 @@ export const Header = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl md:text-2xl font-bold text-charcoal font-heading tracking-tight flex items-center gap-1.5">
-                Hello {firstName} <span className="inline-block animate-bounce">👋</span>
+                Hello {greetingName} <span className="inline-block animate-bounce">👋</span>
               </h1>
             </div>
             <p className="text-xs text-charcoal-muted font-normal mt-0.5">

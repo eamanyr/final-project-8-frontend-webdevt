@@ -19,6 +19,7 @@ import {
 export const TeacherDashboard = () => {
   const {
     currentUser,
+    users,
     courses,
     submissions,
     assignments,
@@ -32,10 +33,25 @@ export const TeacherDashboard = () => {
     (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
   );
 
-  // Filter pending submissions
-  const pendingSubmissions = submissions.filter((s) => s.status === 'Submitted');
+  // Filter pending submissions strictly for courses taught by this teacher
+  const myCourseIds = new Set(myCourses.map((c) => c.id));
+  const pendingSubmissions = submissions.filter(
+    (s) => s.status === 'Submitted' && myCourseIds.has(s.courseId)
+  );
 
-  const totalStudents = myCourses.reduce((acc, c) => acc + (c.studentsCount || 0), 0);
+  const totalStudents = myCourses.reduce(
+    (acc, c) =>
+      acc +
+      (users || []).filter(
+        (u) => u.role === 'student' && u.enrolledCourseIds?.includes(c.id)
+      ).length,
+    0
+  );
+
+  const teacherFirstName = (currentUser?.name || '')
+    .replace(/^Prof\.\s*/i, '')
+    .trim()
+    .split(' ')[0] || 'Faculty';
 
   return (
     <div className="space-y-6">
@@ -46,7 +62,7 @@ export const TeacherDashboard = () => {
             Instructor Portal
           </span>
           <h2 className="text-2xl font-bold text-charcoal font-heading">
-            Welcome back, {currentUser?.name}!
+            Hello Prof. {teacherFirstName}!
           </h2>
           <p className="text-xs text-charcoal-muted mt-0.5">
             {currentUser?.title || 'Course Instructor'} • {currentUser?.department}
@@ -228,7 +244,12 @@ export const TeacherDashboard = () => {
                     {course.title}
                   </h4>
                   <p className="text-[11px] text-charcoal-muted mt-0.5">
-                    {course.studentsCount} enrolled • {course.totalLessons} lessons
+                    {(() => {
+                      const count = (users || []).filter(
+                        (u) => u.role === 'student' && u.enrolledCourseIds?.includes(course.id)
+                      ).length;
+                      return `${count} ${count === 1 ? 'student' : 'students'} enrolled`;
+                    })()} • {course.syllabus?.reduce((acc, u) => acc + (u.lessons || 0), 0) || course.totalLessons || 6} lessons
                   </p>
                 </div>
               </div>

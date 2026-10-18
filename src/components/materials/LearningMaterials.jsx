@@ -5,6 +5,7 @@ import {
   PlusCircle,
   Download,
   Trash2,
+  Edit,
   Search,
   FileText,
   FileCode,
@@ -22,17 +23,28 @@ export const LearningMaterials = () => {
     courses,
     currentUser,
     addMaterial,
+    updateMaterial,
     deleteMaterial,
     addToast,
   } = useLMS();
+
+  const isTeacher = currentUser?.role === 'teacher';
+  const availableCourses = isTeacher
+    ? courses.filter(
+        (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
+      )
+    : courses;
 
   const [courseFilter, setCourseFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
 
+  const [editingMaterialId, setEditingMaterialId] = useState(null);
+
   const [newMaterial, setNewMaterial] = useState({
-    courseId: courses[0]?.id || 'crs-1',
+    courseId: availableCourses[0]?.id || 'crs-1',
+    unitIdx: 'all',
     title: '',
     type: 'pdf',
     size: '3.8 MB',
@@ -42,6 +54,9 @@ export const LearningMaterials = () => {
   const isTeacherOrAdmin = currentUser?.role === 'teacher' || currentUser?.role === 'admin';
 
   const filteredMaterials = materials.filter((m) => {
+    if (isTeacher && !availableCourses.some((c) => c.id === m.courseId)) {
+      return false;
+    }
     if (courseFilter !== 'all' && m.courseId !== courseFilter) return false;
     if (typeFilter !== 'all' && m.type !== typeFilter) return false;
     if (
@@ -71,13 +86,26 @@ export const LearningMaterials = () => {
     }
   };
 
-  const handleCreateMaterial = (e) => {
+  const handleCreateOrUpdateMaterial = (e) => {
     e.preventDefault();
-    if (!newMaterial.title) return;
-    addMaterial(newMaterial);
+    if (!newMaterial.title.trim()) return;
+    const courseObj = courses.find((c) => c.id === newMaterial.courseId);
+    const payload = {
+      ...newMaterial,
+      title: newMaterial.title.trim(),
+      courseTitle: courseObj?.title || 'Studio Course',
+      unitIdx: newMaterial.unitIdx !== 'all' ? Number(newMaterial.unitIdx) : undefined,
+    };
+    if (editingMaterialId) {
+      updateMaterial(editingMaterialId, payload);
+    } else {
+      addMaterial(payload);
+    }
     setShowUploadModal(false);
+    setEditingMaterialId(null);
     setNewMaterial({
-      courseId: courses[0]?.id || 'crs-1',
+      courseId: availableCourses[0]?.id || 'crs-1',
+      unitIdx: 'all',
       title: '',
       type: 'pdf',
       size: '3.8 MB',
@@ -133,8 +161,8 @@ export const LearningMaterials = () => {
             onChange={(e) => setCourseFilter(e.target.value)}
             className="bg-white border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none"
           >
-            <option value="all">All Courses</option>
-            {courses.map((c) => (
+            <option value="all">{isTeacher ? 'All My Assigned Courses' : 'All Courses'}</option>
+            {availableCourses.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.title}
               </option>
@@ -196,15 +224,35 @@ export const LearningMaterials = () => {
 
               <div className="flex items-center gap-2">
                 {isTeacherOrAdmin && (
-                  <button
-                    onClick={() => {
-                      if (confirm(`Remove ${mat.title}?`)) deleteMaterial(mat.id);
-                    }}
-                    className="p-1.5 text-charcoal-muted hover:text-red-600 rounded-lg transition-colors"
-                    title="Delete Resource"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditingMaterialId(mat.id);
+                        setNewMaterial({
+                          courseId: mat.courseId || availableCourses[0]?.id || 'crs-1',
+                          unitIdx: mat.unitIdx !== undefined ? mat.unitIdx : 'all',
+                          title: mat.title || '',
+                          type: mat.type || 'pdf',
+                          size: mat.size || '3.8 MB',
+                          description: mat.description || '',
+                        });
+                        setShowUploadModal(true);
+                      }}
+                      className="p-1.5 text-charcoal-muted hover:text-forest rounded-lg transition-colors cursor-pointer"
+                      title="Edit Resource"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Remove ${mat.title}?`)) deleteMaterial(mat.id);
+                      }}
+                      className="p-1.5 text-charcoal-muted hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                      title="Delete Resource"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
                 )}
 
                 <button
@@ -226,31 +274,54 @@ export const LearningMaterials = () => {
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-charcoal/15 shadow-2xl">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-charcoal/10">
               <h3 className="text-base font-bold font-heading text-charcoal">
-                Upload New Learning Material
+                {editingMaterialId ? 'Edit Learning Resource' : 'Upload New Learning Material'}
               </h3>
               <button
-                onClick={() => setShowUploadModal(false)}
-                className="p-1 rounded-full text-charcoal-muted hover:text-charcoal"
+                onClick={() => {
+                  setShowUploadModal(false);
+                  setEditingMaterialId(null);
+                }}
+                className="p-1 rounded-full text-charcoal-muted hover:text-charcoal cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateMaterial} className="space-y-4">
+            <form onSubmit={handleCreateOrUpdateMaterial} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
                   Target Course
                 </label>
                 <select
                   value={newMaterial.courseId}
-                  onChange={(e) => setNewMaterial({ ...newMaterial, courseId: e.target.value })}
-                  className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                  onChange={(e) => setNewMaterial({ ...newMaterial, courseId: e.target.value, unitIdx: 'all' })}
+                  className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 font-semibold"
                 >
-                  {courses.map((c) => (
+                  {availableCourses.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.title} ({c.code})
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
+                  Target Course Unit (Optional)
+                </label>
+                <select
+                  value={newMaterial.unitIdx}
+                  onChange={(e) => setNewMaterial({ ...newMaterial, unitIdx: e.target.value })}
+                  className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                >
+                  <option value="all">All Units (Course-wide Resource)</option>
+                  {(availableCourses.find((c) => c.id === newMaterial.courseId)?.syllabus || []).map(
+                    (u, uIdx) => (
+                      <option key={uIdx} value={uIdx}>
+                        {u.unit || `Unit ${uIdx + 1}`}: {u.title}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
 
@@ -315,16 +386,19 @@ export const LearningMaterials = () => {
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowUploadModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-charcoal-muted hover:text-charcoal"
+                  onClick={() => {
+                    setShowUploadModal(false);
+                    setEditingMaterialId(null);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-charcoal-muted hover:text-charcoal cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all shadow-md shadow-forest/20"
+                  className="px-5 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all shadow-md shadow-forest/20 cursor-pointer"
                 >
-                  Confirm & Upload
+                  {editingMaterialId ? 'Save Resource Changes' : 'Confirm & Upload'}
                 </button>
               </div>
             </form>

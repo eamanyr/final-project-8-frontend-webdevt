@@ -65,16 +65,16 @@ export const Sidebar = () => {
         badge: unreadAnnouncementsCount > 0 ? unreadAnnouncementsCount : null,
         badgeVariant: 'forest',
       },
-      {
-        id: 'assignments',
-        label: 'To-Do',
-        icon: ListTodo,
-        badge: role === 'student' && studentTodoCount > 0 ? studentTodoCount : null,
-      },
     ];
 
     if (role === 'student') {
       baseItems.push(
+        {
+          id: 'assignments',
+          label: 'To-Do',
+          icon: ListTodo,
+          badge: studentTodoCount > 0 ? studentTodoCount : null,
+        },
         { id: 'grades', label: 'My Grades', icon: GraduationCap },
         { id: 'progress', label: 'My Progress', icon: TrendingUp }
       );
@@ -103,7 +103,14 @@ export const Sidebar = () => {
           badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : null,
           badgeVariant: 'gold',
         },
-        { id: 'users', label: 'User Management', icon: Users }
+        { id: 'users', label: 'User Management', icon: Users },
+        {
+          id: 'submissions',
+          label: 'Submission Review',
+          icon: ClipboardList,
+          badge: pendingGradingCount > 0 ? pendingGradingCount : null,
+          badgeVariant: 'gold',
+        }
       );
     }
 

@@ -805,95 +805,118 @@ const COURSE_UNIT_LESSONS = {
   },
 };
 
+export const getDefaultUnitLessons = (course, unitIdx) => {
+  if (!course) return [];
+  const syllabus = course.syllabus?.length
+    ? course.syllabus
+    : [{ unit: 'Unit 1', title: 'Core Studio Foundations', lessons: 3 }];
+  const unitObj = syllabus[unitIdx] || {
+    unit: `Unit ${unitIdx + 1}`,
+    title: 'Studio Foundations',
+    lessons: 3,
+  };
+  const courseStockLessons = COURSE_UNIT_LESSONS[course.id] || {};
+  const stockLessons = courseStockLessons[unitIdx] || [];
+  const targetCount = Math.max(unitObj.lessons || 2, stockLessons.length);
+
+  const unitLessons = [];
+  for (let lIdx = 0; lIdx < targetCount; lIdx++) {
+    if (stockLessons[lIdx]) {
+      unitLessons.push(stockLessons[lIdx]);
+    } else {
+      const partNumber = lIdx + 1;
+      unitLessons.push({
+        title: `${unitObj.title} — Part ${partNumber}: Advanced Application`,
+        topicHeading: `${unitObj.title} — Studio Deep-Dive`,
+        definition: `Building upon foundational theory, this lesson deepens your practical proficiency in ${unitObj.title} through structured studio methodology, creative problem solving, and critique analysis for ${course.title}.`,
+        majorFunctionsTitle: `Key objectives for Lesson ${partNumber}:`,
+        majorFunctions: [
+          `Demonstrate advanced command of visual language and technique in ${unitObj.title}.`,
+          'Engage in peer critique and reflective iteration to refine visual fidelity.',
+          'Produce academy-level portfolio deliverables adhering to professional studio standards.',
+        ],
+        partsTitle: `Core Elements of Lesson ${partNumber}`,
+        parts: [
+          {
+            term: 'Methodological Precision',
+            desc: 'Refining complex problem areas with iterative feedback and precision craft.',
+          },
+          {
+            term: 'Portfolio Deliverable',
+            desc: 'Finalizing the submission piece with documented process work and conceptual rationale.',
+          },
+        ],
+        diagram: {
+          top: `${unitObj.unit}: Part ${partNumber} Conceptual Brief`,
+          middle1: 'Structured Exploration & Rapid Iteration',
+          middle2: 'Iterative Faculty & Peer Critique',
+          bottom: 'Final Milestone & Unit Deliverable',
+        },
+      });
+    }
+  }
+
+  return unitLessons.map((les, lIdx) => ({
+    id: les.id || `${course.id}-u${unitIdx + 1}-l${lIdx + 1}`,
+    courseId: course.id,
+    unitIdx,
+    unitLabel: unitObj.unit || `Unit ${unitIdx + 1}`,
+    unitTitle: unitObj.title,
+    lessonNumber: lIdx + 1,
+    ...les,
+  }));
+};
+
 export const buildCourseUnitsWithItems = (
   course,
   courseAssignments = [],
-  courseMaterials = []
+  courseMaterials = [],
+  customLessonsMap = {}
 ) => {
   if (!course) return [];
   const syllabus = course.syllabus?.length
     ? course.syllabus
     : [{ unit: 'Unit 1', title: 'Core Studio Foundations', lessons: 3 }];
 
-  const courseLessonsMap = COURSE_UNIT_LESSONS[course.id] || {};
+  const courseCustomLessons =
+    (customLessonsMap && customLessonsMap[course.id]) ||
+    course.customLessons ||
+    {};
 
   return syllabus.map((unitObj, unitIdx) => {
-    const predefinedLessons = courseLessonsMap[unitIdx] || [
-      {
-        title: `${unitObj.title} — Part 1: Core Concepts`,
-        topicHeading: unitObj.title,
-        definition: `${unitObj.title} introduces the foundational studio methodologies, theoretical frameworks, and practical workflows for ${course.title}.`,
-        majorFunctionsTitle: `Key learning objectives of ${unitObj.unit}:`,
-        majorFunctions: [
-          'Understand the historical and contemporary principles underlying this studio unit.',
-          'Apply structured analytical techniques to practical exercises and critiques.',
-          'Prepare portfolio-grade deliverables aligned with academy rubrics.',
-        ],
-        partsTitle: `Core Components of ${unitObj.title}`,
-        parts: [
-          {
-            term: 'Conceptual Foundation',
-            desc: 'The theoretical principles and visual vocabulary that guide studio decision-making.',
-          },
-          {
-            term: 'Applied Studio Craft',
-            desc: 'Hands-on execution techniques refined through iterative sketching and feedback.',
-          },
-        ],
-        diagram: {
-          top: `${unitObj.unit}: Theoretical Briefing`,
-          middle1: 'Guided Studio Exploration',
-          middle2: 'Critique & Iterative Refinement',
-          bottom: 'Mastery & Unit Deliverable',
-        },
-      },
-      {
-        title: `${unitObj.title} — Part 2: Applied Studio Practice`,
-        topicHeading: `Applied Practice: ${unitObj.title}`,
-        definition: `This lesson translates the core theory of ${unitObj.title} into step-by-step studio execution and critique readiness.`,
-        majorFunctionsTitle: 'Major stages of applied execution:',
-        majorFunctions: [
-          'Develop thumbnail explorations to test multiple compositional solutions.',
-          'Refine structural proportions, tonal contrast, and material finish.',
-          'Document process work for peer and instructor review.',
-        ],
-        partsTitle: 'Parts of the Studio Workflow',
-        parts: [
-          {
-            term: 'Exploratory Studies',
-            desc: 'Rapid preliminary iterations created to test form, value, and structure before committing.',
-          },
-          {
-            term: 'Final Resolution',
-            desc: 'Polished execution meeting all technical and conceptual criteria of the unit rubric.',
-          },
-        ],
-        diagram: {
-          top: 'Preliminary Thumbnail Studies',
-          middle1: 'Structural & Tonal Blocking',
-          middle2: 'Detail Articulation & Polish',
-          bottom: 'Completed Unit Study',
-        },
-      },
-    ];
-
-    const lessons = predefinedLessons.map((les, lIdx) => ({
-      id: `${course.id}-u${unitIdx + 1}-l${lIdx + 1}`,
-      courseId: course.id,
-      unitIdx,
-      unitLabel: unitObj.unit || `Unit ${unitIdx + 1}`,
-      unitTitle: unitObj.title,
-      lessonNumber: lIdx + 1,
-      ...les,
-    }));
+    let lessons;
+    if (
+      courseCustomLessons[unitIdx] &&
+      Array.isArray(courseCustomLessons[unitIdx]) &&
+      courseCustomLessons[unitIdx].length > 0
+    ) {
+      lessons = courseCustomLessons[unitIdx].map((les, lIdx) => ({
+        id: les.id || `${course.id}-u${unitIdx + 1}-l${lIdx + 1}`,
+        courseId: course.id,
+        unitIdx,
+        unitLabel: unitObj.unit || `Unit ${unitIdx + 1}`,
+        unitTitle: unitObj.title,
+        lessonNumber: lIdx + 1,
+        ...les,
+      }));
+    } else {
+      lessons = getDefaultUnitLessons(course, unitIdx);
+    }
 
     // Assign materials and assignments across units
-    const unitMaterials = courseMaterials.filter(
-      (_, mIdx) => mIdx % syllabus.length === unitIdx
-    );
-    const unitAssignments = courseAssignments.filter(
-      (_, aIdx) => aIdx % syllabus.length === unitIdx
-    );
+    const unitMaterials = courseMaterials.filter((m, mIdx) => {
+      if (m.unitIdx !== undefined && m.unitIdx !== null) {
+        return m.unitIdx === unitIdx;
+      }
+      return mIdx % syllabus.length === unitIdx;
+    });
+
+    const unitAssignments = courseAssignments.filter((a, aIdx) => {
+      if (a.unitIdx !== undefined && a.unitIdx !== null) {
+        return a.unitIdx === unitIdx;
+      }
+      return aIdx % syllabus.length === unitIdx;
+    });
 
     return {
       unitIdx,

@@ -10,16 +10,25 @@ import {
   ChevronRight,
   Edit2,
   Calendar as CalendarIcon,
+  ShieldCheck,
+  BookOpen,
+  Users,
+  Bell,
+  ClipboardList,
 } from 'lucide-react';
 
 export const RightPanel = () => {
   const {
     currentUser,
+    courses,
     schedule,
     assignments,
     submissions,
+    pendingApprovalsCount,
+    unreadAnnouncementsCount,
     setActiveTab,
     setSelectedAssignmentId,
+    setSelectedSubmissionId,
     setAssignmentOrigin,
     isRightPanelOpen,
   } = useLMS();
@@ -100,9 +109,11 @@ export const RightPanel = () => {
     calendarDays.push(d);
   }
 
-  // Which weekdays have scheduled classes?
+  // Which weekdays have scheduled classes? (Admins do not have personal class schedules)
   const scheduledWeekdays = new Set(
-    (schedule || []).flatMap((item) => getItemDays(item))
+    currentUser.role === 'admin'
+      ? []
+      : (schedule || []).flatMap((item) => getItemDays(item))
   );
 
   // Selected day's weekday & schedule items
@@ -117,9 +128,12 @@ export const RightPanel = () => {
     isSelectedToday ? 'Today, ' : ''
   }${selectedDate.getDate()} ${shortMonth} (${selectedWeekday.slice(0, 3)})`;
 
-  const daySchedule = (schedule || [])
-    .filter((item) => getItemDays(item).includes(selectedWeekday))
-    .sort((a, b) => getItemTimeRange(a)[0] - getItemTimeRange(b)[0]);
+  const daySchedule =
+    currentUser.role === 'admin'
+      ? []
+      : (schedule || [])
+          .filter((item) => getItemDays(item).includes(selectedWeekday))
+          .sort((a, b) => getItemTimeRange(a)[0] - getItemTimeRange(b)[0]);
 
   return (
     <aside className="sticky top-0 h-screen w-80 2xl:w-88 shrink-0 bg-cream/50 border-l border-charcoal/10 p-5 hidden xl:flex flex-col gap-6 overflow-y-auto">
@@ -256,19 +270,39 @@ export const RightPanel = () => {
             <h4 className="text-sm font-bold font-heading text-charcoal shrink-0">
               Schedule
             </h4>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-forest-50 text-forest border border-forest/15 truncate">
-              {selectedDateLabel}
-            </span>
+            {currentUser.role !== 'admin' && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-forest-50 text-forest border border-forest/15 truncate">
+                {selectedDateLabel}
+              </span>
+            )}
           </div>
           <button
             onClick={() => setActiveTab('schedule')}
             className="text-[11px] font-semibold text-charcoal-muted hover:text-forest transition-colors shrink-0 cursor-pointer"
           >
-            See all
+            {currentUser.role === 'admin' ? 'Master Timetable' : 'See all'}
           </button>
         </div>
 
-        {daySchedule.length === 0 ? (
+        {currentUser.role === 'admin' ? (
+          <div className="p-4 rounded-2xl bg-cream/60 border border-charcoal/10 text-center">
+            <div className="w-9 h-9 rounded-full bg-forest/10 text-forest mx-auto mb-2 flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <p className="text-xs font-bold text-charcoal font-heading">
+              No Class Schedule Assigned
+            </p>
+            <p className="text-[11px] text-charcoal-muted mt-1 leading-relaxed">
+              Platform administrators do not attend or instruct personal class blocks.
+            </p>
+            <button
+              onClick={() => setActiveTab('schedule')}
+              className="mt-3 px-3.5 py-1.5 rounded-full bg-forest/10 text-forest hover:bg-forest hover:text-cream text-[11px] font-semibold transition-colors cursor-pointer"
+            >
+              Inspect Campus Timetables
+            </button>
+          </div>
+        ) : daySchedule.length === 0 ? (
           <div className="p-4 rounded-2xl bg-cream/60 border border-charcoal/10 text-center">
             <p className="text-xs font-semibold text-charcoal">
               No classes on {selectedWeekday}
@@ -319,35 +353,188 @@ export const RightPanel = () => {
       {/* Reminders Section (Aligned with To-Do List) */}
       <div className="bg-white rounded-3xl p-5 border border-charcoal/10 shadow-xs">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-bold font-heading text-charcoal">
-            Reminders
-          </h4>
-          <button
-            onClick={() => setActiveTab('todo')}
-            className="text-[11px] font-semibold text-charcoal-muted hover:text-forest transition-colors cursor-pointer"
-          >
-            To-Do List
-          </button>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h4 className="text-sm font-bold font-heading text-charcoal shrink-0">
+              Reminders
+            </h4>
+            {currentUser.role === 'teacher' && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/15 text-gold-dark truncate">
+                Submissions to Review
+              </span>
+            )}
+          </div>
+          {currentUser.role === 'teacher' ? (
+            <button
+              onClick={() => setActiveTab('submissions')}
+              className="text-[11px] font-semibold text-charcoal-muted hover:text-forest transition-colors cursor-pointer"
+            >
+              Submission Review
+            </button>
+          ) : currentUser.role === 'admin' ? (
+            <button
+              onClick={() => setActiveTab('approvals')}
+              className="text-[11px] font-semibold text-charcoal-muted hover:text-forest transition-colors cursor-pointer"
+            >
+              Action Items
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveTab('todo')}
+              className="text-[11px] font-semibold text-charcoal-muted hover:text-forest transition-colors cursor-pointer"
+            >
+              To-Do List
+            </button>
+          )}
         </div>
 
         {(() => {
+          if (currentUser.role === 'admin') {
+            const adminReminders = [];
+            if (pendingApprovalsCount > 0) {
+              adminReminders.push({
+                id: 'adm-approvals',
+                title: `${pendingApprovalsCount} Student Admission${pendingApprovalsCount > 1 ? 's' : ''} Pending`,
+                subtitle: 'Review & approve new student registration requests',
+                tab: 'approvals',
+                icon: ShieldCheck,
+                badge: 'High Priority',
+              });
+            }
+            if (unreadAnnouncementsCount > 0) {
+              adminReminders.push({
+                id: 'adm-broadcasts',
+                title: `${unreadAnnouncementsCount} Campus Broadcast${unreadAnnouncementsCount > 1 ? 's' : ''}`,
+                subtitle: 'Review academy announcements and notices',
+                tab: 'announcements',
+                icon: Bell,
+                badge: 'Notice',
+              });
+            }
+            adminReminders.push({
+              id: 'adm-courses',
+              title: `${courses.length} Active Courses in Catalog`,
+              subtitle: 'Audit course syllabi, teachers & enrollments',
+              tab: 'courses',
+              icon: BookOpen,
+              badge: 'Catalog',
+            });
+            adminReminders.push({
+              id: 'adm-users',
+              title: 'User Governance & Roles',
+              subtitle: 'Manage faculty, student, and admin permissions',
+              tab: 'users',
+              icon: Users,
+              badge: 'Admin',
+            });
+
+            return (
+              <div className="flex flex-col gap-2.5">
+                {adminReminders.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => setActiveTab(item.tab)}
+                      className="flex items-start gap-3 p-2.5 rounded-2xl hover:bg-cream/70 transition-colors cursor-pointer group"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-forest/10 text-forest flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <h5 className="text-xs font-semibold text-charcoal truncate group-hover:text-forest transition-colors">
+                            {item.title}
+                          </h5>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-forest-50 text-forest shrink-0">
+                            {item.badge}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-charcoal-muted mt-0.5 truncate">
+                          {item.subtitle}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          if (currentUser.role === 'teacher') {
+            const teacherCourses = courses.filter(
+              (c) => c.instructorId === currentUser.id || currentUser.assignedCourseIds?.includes(c.id)
+            );
+            const teacherCourseIds = new Set(teacherCourses.map((c) => c.id));
+            const pendingTeacherSubmissions = (submissions || []).filter(
+              (s) => s.status === 'Submitted' && teacherCourseIds.has(s.courseId)
+            );
+
+            if (pendingTeacherSubmissions.length === 0) {
+              return (
+                <div className="p-4 rounded-2xl bg-cream/60 border border-charcoal/10 text-center">
+                  <p className="text-xs font-semibold text-charcoal">
+                    All Submissions Reviewed!
+                  </p>
+                  <p className="text-[11px] text-charcoal-muted mt-0.5">
+                    No pending student submissions currently awaiting your evaluation.
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="flex flex-col gap-2.5">
+                {pendingTeacherSubmissions.map((sub) => (
+                  <div
+                    key={sub.id}
+                    onClick={() => {
+                      setSelectedSubmissionId(sub.id);
+                      setActiveTab('submissions');
+                    }}
+                    className="flex items-start gap-3 p-2.5 rounded-2xl hover:bg-cream/70 transition-colors cursor-pointer group"
+                  >
+                    <img
+                      src={sub.studentAvatar}
+                      alt={sub.studentName}
+                      className="w-8 h-8 rounded-xl object-cover border border-charcoal/10 shrink-0 group-hover:scale-105 transition-transform"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <h5 className="text-xs font-semibold text-charcoal truncate group-hover:text-forest transition-colors">
+                          {sub.studentName}
+                        </h5>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gold/15 text-gold-dark shrink-0">
+                          Review
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-charcoal font-medium truncate">
+                        {sub.assignmentTitle}
+                      </p>
+                      <p className="text-[10px] text-charcoal-muted mt-0.5 truncate">
+                        {sub.courseName} • Submitted {sub.submissionDate?.split(' ')[0] || sub.submittedDate || 'Recent'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+
+          // Student: Enrolled course assignments due
           const pendingTodoReminders = (assignments || [])
             .filter((asg) => {
-              if (currentUser.role === 'student') {
-                const inEnrolledCourse =
-                  !currentUser.enrolledCourseIds?.length ||
-                  currentUser.enrolledCourseIds.includes(asg.courseId);
-                const alreadySubmitted = (submissions || []).some(
-                  (s) =>
-                    s.assignmentId === asg.id && s.studentId === currentUser.id
-                );
-                return (
-                  inEnrolledCourse &&
-                  !alreadySubmitted &&
-                  asg.status !== 'Graded'
-                );
-              }
-              return asg.status !== 'Graded';
+              const inEnrolledCourse =
+                !currentUser.enrolledCourseIds?.length ||
+                currentUser.enrolledCourseIds.includes(asg.courseId);
+              const alreadySubmitted = (submissions || []).some(
+                (s) =>
+                  s.assignmentId === asg.id && s.studentId === currentUser.id
+              );
+              return (
+                inEnrolledCourse &&
+                !alreadySubmitted &&
+                asg.status !== 'Graded'
+              );
             })
             .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 

@@ -73,6 +73,12 @@ export const Announcements = () => {
   });
 
   const isTeacherOrAdmin = currentUser?.role === 'teacher' || currentUser?.role === 'admin';
+  const isTeacher = currentUser?.role === 'teacher';
+  const availableCourses = isTeacher
+    ? courses.filter(
+        (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
+      )
+    : courses;
 
   const getReplies = (item) => {
     if (!item) return [];
@@ -422,7 +428,7 @@ export const Announcements = () => {
                   className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
                 >
                   <option value="all">All Academy Cohorts & Faculty</option>
-                  {courses.map((c) => (
+                  {availableCourses.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.title}
                     </option>

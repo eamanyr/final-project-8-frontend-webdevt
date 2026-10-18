@@ -20,6 +20,7 @@ import {
 export const StudentDashboard = () => {
   const {
     currentUser,
+    users,
     courses,
     assignments,
     submissions,
@@ -240,11 +241,22 @@ export const StudentDashboard = () => {
                 <div className="flex items-center gap-4 mt-3 text-[11px] text-charcoal-muted">
                   <span className="flex items-center gap-1">
                     <FileText className="w-3.5 h-3.5 text-forest" />
-                    {course.totalLessons} lessons
+                    {(() => {
+                      const totalLessons =
+                        course.syllabus?.reduce((acc, u) => acc + (u.lessons || 0), 0) ||
+                        course.totalLessons ||
+                        6;
+                      return `${totalLessons} lessons`;
+                    })()}
                   </span>
                   <span className="flex items-center gap-1">
                     <Users className="w-3.5 h-3.5 text-forest" />
-                    {course.studentsCount} students
+                    {(() => {
+                      const count = (users || []).filter(
+                        (u) => u.role === 'student' && u.enrolledCourseIds?.includes(course.id)
+                      ).length;
+                      return `${count} ${count === 1 ? 'student' : 'students'}`;
+                    })()}
                   </span>
                 </div>
               </div>

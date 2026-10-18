@@ -17,6 +17,7 @@ export const CourseList = () => {
   const {
     courses,
     currentUser,
+    users,
     setActiveTab,
     setSelectedCourseId,
     toggleEnrollCourse,
@@ -26,9 +27,20 @@ export const CourseList = () => {
 
   const [activeTabFilter, setActiveTabFilter] = useState('all');
 
-  const filteredCourses = courses.filter((course) => {
-    // Tab filter (only applies to non-admin roles)
-    if (currentUser?.role !== 'admin') {
+  const isTeacher = currentUser?.role === 'teacher';
+  const isAdmin = currentUser?.role === 'admin';
+  const isStudent = currentUser?.role === 'student';
+
+  // If teacher, they can ONLY see courses assigned / led by them
+  const baseCourses = isTeacher
+    ? courses.filter(
+        (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
+      )
+    : courses;
+
+  const filteredCourses = baseCourses.filter((course) => {
+    // Tab filter (only applies to student role)
+    if (isStudent) {
       const isEnrolled = currentUser?.enrolledCourseIds?.includes(course.id);
       if (activeTabFilter === 'enrolled' && !isEnrolled) return false;
       if (activeTabFilter === 'completed' && course.progress < 100) return false;
@@ -56,13 +68,19 @@ export const CourseList = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-white border border-charcoal/10 shadow-xs">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-forest px-2.5 py-0.5 rounded-full bg-forest/10 inline-block mb-1">
-            Curriculum Directory
+            {isTeacher ? 'Instructor Portal' : 'Curriculum Directory'}
           </span>
           <h2 className="text-2xl font-bold text-charcoal font-heading">
-            {currentUser?.role === 'admin' ? 'All Courses' : 'Browse & Enrolled Courses'}
+            {isTeacher
+              ? 'Courses Led by You'
+              : isAdmin
+              ? 'All Courses'
+              : 'Browse & Enrolled Courses'}
           </h2>
           <p className="text-xs text-charcoal-muted mt-0.5">
-            Discover accredited studio disciplines, modern frameworks, and craft workshops
+            {isTeacher
+              ? 'Manage curriculum units, class rosters, submissions, and Google Meet online classes for your assigned studio courses'
+              : 'Discover accredited studio disciplines, modern frameworks, and craft workshops'}
           </p>
         </div>
 
@@ -85,16 +103,18 @@ export const CourseList = () => {
           <button
             onClick={() => setActiveTabFilter('all')}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              activeTabFilter === 'all' || currentUser?.role === 'admin'
+              activeTabFilter === 'all' || !isStudent
                 ? 'bg-charcoal text-cream shadow-xs font-bold'
                 : 'text-charcoal-muted hover:text-charcoal'
             }`}
           >
-            {currentUser?.role === 'admin'
+            {isTeacher
+              ? `My Assigned Courses (${baseCourses.length})`
+              : isAdmin
               ? `All Courses (${courses.length})`
               : `Explore All (${courses.length})`}
           </button>
-          {currentUser?.role !== 'admin' && (
+          {isStudent && (
             <>
               <button
                 onClick={() => setActiveTabFilter('enrolled')}
@@ -217,11 +237,22 @@ export const CourseList = () => {
                   <div className="mt-4 pt-3 border-t border-charcoal/10 flex items-center justify-between text-xs text-charcoal-muted">
                     <span className="flex items-center gap-1">
                       <FileText className="w-3.5 h-3.5 text-forest" />
-                      {course.totalLessons} Lessons
+                      {(() => {
+                        const totalLessons =
+                          course.syllabus?.reduce((acc, u) => acc + (u.lessons || 0), 0) ||
+                          course.totalLessons ||
+                          6;
+                        return `${totalLessons} Lessons`;
+                      })()}
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="w-3.5 h-3.5 text-forest" />
-                      {course.studentsCount} Learners
+                      {(() => {
+                        const count = (users || []).filter(
+                          (u) => u.role === 'student' && u.enrolledCourseIds?.includes(course.id)
+                        ).length;
+                        return `${count} ${count === 1 ? 'Learner' : 'Learners'}`;
+                      })()}
                     </span>
                     <span className="font-medium text-charcoal">
                       {course.duration}

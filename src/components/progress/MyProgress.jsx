@@ -100,7 +100,9 @@ export const MyProgress = () => {
                 </div>
                 <div className="text-right">
                   <span className="text-xs font-bold text-forest">
-                    {c.completedLessons || 0} / {c.totalLessons} Lessons
+                    {c.completedLessons || 0} /{' '}
+                    {c.syllabus?.reduce((acc, u) => acc + (u.lessons || 0), 0) || c.totalLessons || 6}{' '}
+                    Lessons
                   </span>
                   <span className="text-xs font-extrabold text-charcoal ml-2">
                     ({c.progress}%)

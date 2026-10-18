@@ -16,6 +16,7 @@ import {
   Save,
   Edit3,
   X,
+  ShieldCheck,
 } from 'lucide-react';
 
 const minutesToTimeInput = (totalMins) => {
@@ -42,6 +43,9 @@ export const SchedulePage = () => {
     scheduleTitle,
     setScheduleTitle,
     courses,
+    currentUser,
+    users,
+    switchUserById,
     addScheduleItem,
     updateScheduleItem,
     deleteScheduleItem,
@@ -55,17 +59,27 @@ export const SchedulePage = () => {
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
 
+  const isTeacher = currentUser?.role === 'teacher';
+  const availableCourses = isTeacher
+    ? courses.filter(
+        (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
+      )
+    : courses;
+
   const handleOpenAdd = (defaultDay = 'Monday', defaultStart = '09:00') => {
+    if (currentUser?.role === 'admin') return;
     setEditingId(null);
     const [sh, sm] = defaultStart.split(':').map(Number);
     const startMins = sh * 60 + (sm || 0);
     const endMins = Math.min(20 * 60, startMins + 90);
+    const defaultCourse = availableCourses[0] || courses[0];
+
     setFormData({
       ...EMPTY_FORM,
-      code: courses[0]?.code || 'ART-201',
-      title: courses[0]?.title || 'Studio Session',
-      course: courses[0]?.title || 'Modern Art & Contemporary Expression',
-      instructor: courses[0]?.instructorName || 'Prof. Alicia Mayer',
+      code: defaultCourse?.code || 'ART-201',
+      title: defaultCourse?.title || 'Studio Session',
+      course: defaultCourse?.title || 'Modern Art & Contemporary Expression',
+      instructor: isTeacher ? currentUser?.name : defaultCourse?.instructorName || 'Prof. Alicia Mayer',
       days: [defaultDay],
       startTime: minutesToTimeInput(startMins),
       endTime: minutesToTimeInput(endMins),
@@ -74,6 +88,7 @@ export const SchedulePage = () => {
   };
 
   const handleOpenEdit = (item) => {
+    if (currentUser?.role === 'admin') return;
     setEditingId(item.id);
     const [startMins, endMins] = getItemTimeRange(item);
     setFormData({
@@ -155,7 +170,12 @@ export const SchedulePage = () => {
         </button>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {isScheduleEditMode ? (
+          {currentUser?.role === 'admin' ? (
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-forest/10 border border-forest/20 text-forest text-xs font-semibold">
+              <ShieldCheck className="w-4 h-4" />
+              <span>Campus Master Overview (Administrators do not hold personal class schedules)</span>
+            </div>
+          ) : isScheduleEditMode ? (
             <>
               <span className="text-xs text-charcoal-muted hidden md:inline">
                 Edit Mode: Click any class block to edit or click an empty time slot to add a session.
@@ -186,6 +206,90 @@ export const SchedulePage = () => {
           )}
         </div>
       </div>
+
+      {/* Active User Personalized Schedule Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-3xl bg-white border border-charcoal/10 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <img
+            src={currentUser?.avatar}
+            alt={currentUser?.name}
+            className="w-12 h-12 rounded-2xl object-cover border border-charcoal/10 shadow-2xs shrink-0"
+          />
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold font-heading text-charcoal">
+                {currentUser?.name}'s Timetable
+              </h2>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-forest/10 text-forest">
+                {currentUser?.role === 'teacher' ? 'Faculty Instructor' : currentUser?.role === 'admin' ? 'Academy Admin' : 'Active Student'}
+              </span>
+            </div>
+            <p className="text-xs text-charcoal-muted mt-0.5">
+              {currentUser?.role === 'teacher'
+                ? 'Your studio lectures, masterclasses, and office hours for courses led by you.'
+                : currentUser?.role === 'admin'
+                ? 'Administrators do not hold personal class schedules. Use the switcher to inspect timetables for faculty instructors or students.'
+                : 'Your personalized timetable aligned with your enrolled courses and studio sessions.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Quick User Schedule Switcher Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+          <span className="text-[11px] font-bold text-charcoal-muted shrink-0 mr-1 hidden lg:inline">
+            Switch Schedule:
+          </span>
+          {users
+            .filter((u) => u.status === 'approved')
+            .map((u) => {
+              const isActive = u.id === currentUser?.id;
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => switchUserById(u.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-forest text-cream shadow-xs font-bold ring-2 ring-forest/30'
+                      : 'bg-cream/60 hover:bg-cream border border-charcoal/10 text-charcoal'
+                  }`}
+                  title={`View schedule for ${u.name} (${u.role})`}
+                >
+                  <img src={u.avatar} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  <span>{u.name.split(' ')[0]}</span>
+                  <span className="text-[10px] opacity-70">
+                    {u.role === 'teacher' ? '(Prof)' : u.role === 'admin' ? '(Admin)' : ''}
+                  </span>
+                </button>
+              );
+            })}
+        </div>
+      </div>
+
+      {/* Admin Advisory Banner */}
+      {currentUser?.role === 'admin' && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-amber-50/70 border border-amber-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-bold text-amber-950">
+                Administrative Registry: No Personal Class Schedules
+              </h4>
+              <p className="text-xs text-amber-900/80 mt-0.5">
+                Super-administrators manage platform registry, student admissions, and curriculum oversight rather than attending or instructing class sessions.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveTab('approvals')}
+            className="px-3.5 py-1.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all shrink-0 cursor-pointer shadow-xs"
+          >
+            Review Admissions
+          </button>
+        </div>
+      )}
 
       {/* Interactive Gizmoa-Style Week Calendar */}
       <WeeklyCalendarGrid

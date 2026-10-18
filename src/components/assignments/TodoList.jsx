@@ -13,6 +13,10 @@ import {
   Sparkles,
   ChevronRight,
   Flame,
+  ShieldCheck,
+  UserCheck,
+  Users,
+  ClipboardList,
 } from 'lucide-react';
 
 const DEFAULT_PUBLISHED_DATES = {
@@ -34,14 +38,294 @@ export const TodoList = () => {
     courses,
     submissions,
     currentUser,
+    users,
+    pendingApprovalsCount,
     setActiveTab,
     setSelectedAssignmentId,
+    setSelectedSubmissionId,
   } = useLMS();
 
   // Default sort: what was published first
   const [sortBy, setSortBy] = useState('published'); // 'published' | 'dueDate' | 'priority'
   const [selectedCourseFilter, setSelectedCourseFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('todo'); // 'todo' | 'completed'
+
+  // If user is Teacher, teachers do not have a To-Do list. Render instructor submissions queue.
+  if (currentUser?.role === 'teacher') {
+    const teacherCourses = courses.filter(
+      (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
+    );
+    const teacherCourseIds = new Set(teacherCourses.map((c) => c.id));
+    const pendingTeacherSubmissions = (submissions || []).filter(
+      (s) => s.status === 'Submitted' && teacherCourseIds.has(s.courseId)
+    );
+
+    return (
+      <div className="space-y-6">
+        {/* Top Header Banner for Teacher */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-white border border-charcoal/10 shadow-xs">
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-forest px-2.5 py-0.5 rounded-full bg-forest/10 inline-flex items-center gap-1.5 mb-1">
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>Faculty Portal</span>
+            </span>
+            <h2 className="text-2xl font-bold text-charcoal font-heading">
+              Instructor Submissions Queue
+            </h2>
+            <p className="text-xs text-charcoal-muted mt-0.5">
+              Faculty instructors do not have personal homework assignments or a student To-Do list. Manage your course curriculum and student grading queue below.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('submissions')}
+              className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <ClipboardList className="w-4 h-4 text-gold" />
+              <span>Submission Review ({pendingTeacherSubmissions.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('create-assignment')}
+              className="px-4 py-2 rounded-xl bg-gold text-charcoal text-xs font-bold hover:bg-gold-hover transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Create Assignment</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Role Scoping Notice */}
+        <div className="p-4 rounded-2xl bg-forest-50/70 border border-forest/20 flex items-start gap-3">
+          <Sparkles className="w-5 h-5 text-forest shrink-0 mt-0.5" />
+          <div className="text-xs text-charcoal leading-relaxed">
+            <span className="font-bold text-forest">Role-Based Workflow:</span> As a course instructor ({currentUser?.name}), you assign coursework and grade learner submissions. Student homework To-Do lists are exclusively scoped to enrolled learners.
+          </div>
+        </div>
+
+        {/* Submissions Queue */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-sm font-bold font-heading text-charcoal">
+              Submissions Awaiting Grading ({pendingTeacherSubmissions.length})
+            </h3>
+            <button
+              onClick={() => setActiveTab('submissions')}
+              className="text-xs font-bold text-forest hover:underline cursor-pointer"
+            >
+              Open Full Review Panel →
+            </button>
+          </div>
+
+          {pendingTeacherSubmissions.length === 0 ? (
+            <div className="p-8 rounded-3xl bg-white border border-charcoal/10 text-center text-charcoal-muted text-xs">
+              🎉 No submissions currently awaiting your review! All submitted coursework has been evaluated.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pendingTeacherSubmissions.map((sub) => (
+                <div
+                  key={sub.id}
+                  onClick={() => {
+                    setSelectedSubmissionId(sub.id);
+                    setActiveTab('submissions');
+                  }}
+                  className="p-5 rounded-3xl bg-white border border-charcoal/10 shadow-2xs hover:border-forest/30 transition-all cursor-pointer flex items-start justify-between gap-4 group"
+                >
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={sub.studentAvatar}
+                      alt={sub.studentName}
+                      className="w-10 h-10 rounded-2xl object-cover border border-charcoal/10 shrink-0"
+                    />
+                    <div>
+                      <span className="text-[10px] font-bold text-gold-dark uppercase tracking-wider px-2 py-0.5 rounded-full bg-gold/15">
+                        Awaiting Grade
+                      </span>
+                      <h4 className="text-xs sm:text-sm font-bold text-charcoal mt-1 group-hover:text-forest transition-colors">
+                        {sub.assignmentTitle}
+                      </h4>
+                      <p className="text-[11px] text-charcoal-muted mt-0.5">
+                        {sub.studentName} • {sub.courseName}
+                      </p>
+                      <p className="text-[10px] text-charcoal-muted mt-1 font-mono">
+                        Submitted: {sub.submittedDate}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-charcoal-muted group-hover:text-forest group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // If user is Admin, render Administrative Action Items instead of course homework assignments
+  if (currentUser?.role === 'admin') {
+    const pendingApplicants = (users || []).filter((u) => u.status === 'pending');
+    return (
+      <div className="space-y-6">
+        {/* Top Header Banner for Admin */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-white border border-charcoal/10 shadow-xs">
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-forest px-2.5 py-0.5 rounded-full bg-forest/10 inline-flex items-center gap-1.5 mb-1">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Administrative Registry</span>
+            </span>
+            <h2 className="text-2xl font-bold text-charcoal font-heading">
+              Admin Action Items
+            </h2>
+            <p className="text-xs text-charcoal-muted mt-0.5">
+              Super-administrator pending tasks, admissions reviews, and platform governance. Administrators do not have course homework assignments.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('approvals')}
+              className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <UserCheck className="w-4 h-4 text-gold" />
+              <span>Pending Admissions ({pendingApprovalsCount})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Notice Card: Clear Role-Based Scoping Explanation */}
+        <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/60 flex items-start gap-3">
+          <Sparkles className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-900 leading-relaxed">
+            <span className="font-bold">Role-Based Scoping:</span> As a platform administrator ({currentUser?.name}), you do not have academic homework assignments or submission tasks. Your To-Do list consists of institutional applicant reviews, accreditation management, and course audits.
+          </div>
+        </div>
+
+        {/* Administrative Task Cards */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-bold font-heading text-charcoal px-1">
+            Pending Institutional Action Items ({pendingApplicants.length + 2})
+          </h3>
+
+          {/* 1. Pending Applicant Review Items */}
+          {pendingApplicants.map((applicant) => (
+            <div
+              key={applicant.id}
+              className="p-5 rounded-3xl bg-white border border-charcoal/10 shadow-2xs hover:border-forest/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+            >
+              <div className="flex items-start gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-gold/15 text-gold-dark flex items-center justify-center font-bold text-xs shrink-0 border border-gold/30">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                      Admission Review Needed
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cream text-charcoal-muted">
+                      ID: {applicant.studentId || 'New Applicant'}
+                    </span>
+                  </div>
+                  <h4 className="text-sm sm:text-base font-bold text-charcoal mt-1">
+                    Review Application: {applicant.name}
+                  </h4>
+                  <p className="text-xs text-charcoal-muted mt-0.5">
+                    Target Department: {applicant.department} • Applied: {applicant.joinedDate}
+                  </p>
+                  {applicant.registrationNotes && (
+                    <p className="text-xs text-charcoal bg-cream/40 p-2.5 rounded-xl border border-charcoal/10 mt-2 italic">
+                      "{applicant.registrationNotes}"
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                <button
+                  onClick={() => setActiveTab('approvals')}
+                  className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <span>Review Application</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {/* 2. Course & Curriculum Audit Item */}
+          <div className="p-5 rounded-3xl bg-white border border-charcoal/10 shadow-2xs hover:border-forest/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-forest/10 text-forest flex items-center justify-center font-bold text-xs shrink-0 border border-forest/20">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-forest-50 text-forest border border-forest/20">
+                    Curriculum Governance
+                  </span>
+                  <span className="text-xs font-semibold text-charcoal-muted">
+                    Academic Directory
+                  </span>
+                </div>
+                <h4 className="text-sm sm:text-base font-bold text-charcoal mt-1">
+                  Faculty Assignment &amp; Course Capacities Audit
+                </h4>
+                <p className="text-xs text-charcoal-muted mt-0.5">
+                  Verify teacher allocations and minimum student counts across {courses.length} active studio courses.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+              <button
+                onClick={() => setActiveTab('courses')}
+                className="px-4 py-2 rounded-xl border border-charcoal/20 bg-cream/50 hover:bg-cream text-xs font-bold text-charcoal transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Inspect All Courses</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* 3. User Accreditation & Role Audit Item */}
+          <div className="p-5 rounded-3xl bg-white border border-charcoal/10 shadow-2xs hover:border-forest/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-sage/20 text-forest flex items-center justify-center font-bold text-xs shrink-0 border border-sage/30">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-sage-50 text-forest border border-sage/20">
+                    Platform Governance
+                  </span>
+                  <span className="text-xs font-semibold text-charcoal-muted">
+                    Registry
+                  </span>
+                </div>
+                <h4 className="text-sm sm:text-base font-bold text-charcoal mt-1">
+                  User Accreditation &amp; Security Verification
+                </h4>
+                <p className="text-xs text-charcoal-muted mt-0.5">
+                  Manage active student and faculty accounts, edit credentials, and oversee permissions.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+              <button
+                onClick={() => setActiveTab('users')}
+                className="px-4 py-2 rounded-xl border border-charcoal/20 bg-cream/50 hover:bg-cream text-xs font-bold text-charcoal transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Manage Users</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const isStudent = currentUser?.role === 'student';
   const isTeacherOrAdmin =

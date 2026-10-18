@@ -3,10 +3,18 @@ import { useLMS } from '../../context/LMSContext';
 import { ArrowLeft, Plus, Trash2, Save, FileCheck2 } from 'lucide-react';
 
 export const AssignmentForm = () => {
-  const { courses, addAssignment, setActiveTab, setSelectedAssignmentId } = useLMS();
+  const { courses, currentUser, addAssignment, setActiveTab, setSelectedAssignmentId } = useLMS();
+
+  const isTeacher = currentUser?.role === 'teacher';
+  const availableCourses = isTeacher
+    ? courses.filter(
+        (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
+      )
+    : courses;
 
   const [formData, setFormData] = useState({
-    courseId: courses[0]?.id || 'crs-1',
+    courseId: availableCourses[0]?.id || 'crs-1',
+    unitIdx: 0,
     title: '',
     description: '',
     dueDate: '2026-10-30',
@@ -41,10 +49,15 @@ export const AssignmentForm = () => {
       alert('Please fill in assignment title and description.');
       return;
     }
-    const created = addAssignment(formData);
-    setSelectedAssignmentId(created.id);
+    const created = addAssignment({
+      ...formData,
+      unitIdx: Number(formData.unitIdx) || 0,
+    });
+    if (created?.id) setSelectedAssignmentId(created.id);
     setActiveTab('assignment-details');
   };
+
+  const selectedCourseObj = availableCourses.find((c) => c.id === formData.courseId) || availableCourses[0];
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -74,19 +87,36 @@ export const AssignmentForm = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
                 Target Course
               </label>
               <select
                 value={formData.courseId}
-                onChange={(e) => setFormData({ ...formData, courseId: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                onChange={(e) => setFormData({ ...formData, courseId: e.target.value, unitIdx: 0 })}
+                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 font-semibold"
               >
-                {courses.map((c) => (
+                {availableCourses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.title} ({c.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
+                Target Curriculum Unit
+              </label>
+              <select
+                value={formData.unitIdx}
+                onChange={(e) => setFormData({ ...formData, unitIdx: Number(e.target.value) })}
+                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 font-semibold"
+              >
+                {(selectedCourseObj?.syllabus || []).map((u, uIdx) => (
+                  <option key={uIdx} value={uIdx}>
+                    {u.unit || `Unit ${uIdx + 1}`}: {u.title}
                   </option>
                 ))}
               </select>

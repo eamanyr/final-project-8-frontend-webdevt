@@ -150,39 +150,76 @@ export const Profile = () => {
         </div>
       )}
 
-      {/* Weekly Schedule Section (Gizmoa-style Week Calendar) */}
-      <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-          <div>
-            <h3 className="text-base font-bold font-heading text-charcoal">
-              My Schedule
-            </h3>
-            <p className="text-xs text-charcoal-muted mt-0.5">
-              Weekly studio &amp; lecture timetable (click any block or button to customize)
-            </p>
+      {/* Weekly Schedule Section (Students & Faculty only) / Administrative Oversight (Admins) */}
+      {currentUser.role === 'admin' ? (
+        <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-forest/10 text-forest flex items-center justify-center shrink-0">
+                <Shield className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold font-heading text-charcoal">
+                  Super-Administrator Governance & Master Timetable
+                </h3>
+                <p className="text-xs text-charcoal-muted mt-1 max-w-xl leading-relaxed">
+                  Administrators do not hold individual course schedules or student homework tasks. You oversee institution-wide operations, admissions approvals, and campus timetables across all departments.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-center shrink-0">
+              <button
+                onClick={() => setActiveTab('schedule')}
+                className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Campus Timetables</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('approvals')}
+                className="px-4 py-2 rounded-xl bg-charcoal text-cream text-xs font-bold hover:bg-charcoal-light transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>Review Admissions</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div>
+              <h3 className="text-base font-bold font-heading text-charcoal">
+                My Schedule
+              </h3>
+              <p className="text-xs text-charcoal-muted mt-0.5">
+                Weekly studio &amp; lecture timetable (click any block or button to customize)
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setIsScheduleEditMode(true);
+                setActiveTab('schedule');
+              }}
+              className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all flex items-center gap-1.5 shadow-sm self-start sm:self-center cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Edit &amp; Modify Schedule</span>
+            </button>
           </div>
 
-          <button
-            onClick={() => {
+          <WeeklyCalendarGrid
+            schedule={schedule}
+            scheduleTitle={scheduleTitle}
+            onSelectBlock={() => {
               setIsScheduleEditMode(true);
               setActiveTab('schedule');
             }}
-            className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all flex items-center gap-1.5 shadow-sm self-start sm:self-center cursor-pointer"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Edit &amp; Modify Schedule</span>
-          </button>
+          />
         </div>
-
-        <WeeklyCalendarGrid
-          schedule={schedule}
-          scheduleTitle={scheduleTitle}
-          onSelectBlock={() => {
-            setIsScheduleEditMode(true);
-            setActiveTab('schedule');
-          }}
-        />
-      </div>
+      )}
     </div>
   );
 };
