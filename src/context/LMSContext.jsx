@@ -41,7 +41,10 @@ export const LMSProvider = ({ children }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return parsed.map((c) =>
+        const existingIds = new Set(parsed.map((c) => c.id));
+        const missing = INITIAL_COURSES.filter((c) => !existingIds.has(c.id));
+        const combined = [...parsed, ...missing];
+        return combined.map((c) =>
           c.thumbnail?.includes('photo-1579783902614-a3fb3927b675')
             ? {
                 ...c,
@@ -59,7 +62,17 @@ export const LMSProvider = ({ children }) => {
 
   const [assignments, setAssignments] = useState(() => {
     const saved = localStorage.getItem('cacheup_assignments');
-    return saved ? JSON.parse(saved) : INITIAL_ASSIGNMENTS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const existingIds = new Set(parsed.map((a) => a.id));
+        const missing = INITIAL_ASSIGNMENTS.filter((a) => !existingIds.has(a.id));
+        return [...parsed, ...missing];
+      } catch {
+        return INITIAL_ASSIGNMENTS;
+      }
+    }
+    return INITIAL_ASSIGNMENTS;
   });
 
   const [submissions, setSubmissions] = useState(() => {
@@ -69,7 +82,17 @@ export const LMSProvider = ({ children }) => {
 
   const [materials, setMaterials] = useState(() => {
     const saved = localStorage.getItem('cacheup_materials');
-    return saved ? JSON.parse(saved) : INITIAL_MATERIALS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const existingIds = new Set(parsed.map((m) => m.id));
+        const missing = INITIAL_MATERIALS.filter((m) => !existingIds.has(m.id));
+        return [...parsed, ...missing];
+      } catch {
+        return INITIAL_MATERIALS;
+      }
+    }
+    return INITIAL_MATERIALS;
   });
 
   const [announcements, setAnnouncements] = useState(() => {
@@ -84,8 +107,17 @@ export const LMSProvider = ({ children }) => {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.some((item) => item.startTime || item.days)) {
           return parsed.map((item) => {
-            if (item.id === 'sch-6' && Array.isArray(item.days) && item.days.length === 1 && item.days[0] === 'Saturday') {
-              return { ...item, days: ['Saturday', 'Sunday'], day: 'Sat, Sun' };
+            if (item.id === 'sch-5') {
+              return { ...item, courseId: 'crs-5', course: 'Fine Arts Portfolio Seminar' };
+            }
+            if (item.id === 'sch-6') {
+              return {
+                ...item,
+                courseId: 'crs-6',
+                course: 'Digital Figure Illustration Lab',
+                days: Array.isArray(item.days) && item.days.includes('Sunday') ? item.days : ['Saturday', 'Sunday'],
+                day: 'Sat, Sun'
+              };
             }
             if (item.id === 'sch-3' && Array.isArray(item.days) && item.days.length === 1 && item.days[0] === 'Thursday') {
               return { ...item, days: ['Tuesday', 'Thursday'], day: 'Tue, Thu' };

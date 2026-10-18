@@ -555,6 +555,254 @@ const COURSE_UNIT_LESSONS = {
       },
     ],
   },
+  'crs-5': {
+    0: [
+      {
+        title: 'Curatorial Intent & The Professional Artist Statement',
+        topicHeading: 'Curatorial Frameworks & Artist Intent',
+        definition:
+          'A professional artist statement articulates the philosophical, technical, and thematic motivations of a visual body of work, contextualizing studio discoveries for gallery curators and collectors.',
+        majorFunctionsTitle: 'Core objectives of the artist statement:',
+        majorFunctions: [
+          'Establishes conceptual clarity without over-explaining visual metaphors.',
+          'Frames technical materiality and medium choices in relation to subject matter.',
+          'Provides critical vocabulary for exhibition labels, catalogs, and grant proposals.',
+        ],
+        partsTitle: 'Structural Pillars of Curatorial Staging',
+        parts: [
+          {
+            term: 'Conceptual Thesis',
+            desc: 'The central philosophical or emotional inquiry driving the studio collection.',
+          },
+          {
+            term: 'Material Dialogue',
+            desc: 'The intentional relationship between chosen mediums (oil, linen, graphite) and the message.',
+          },
+        ],
+        diagram: {
+          top: 'Core Conceptual Inquiry',
+          middle1: 'Material & Studio Investigation',
+          middle2: 'Peer Discourse & Curatorial Edit',
+          bottom: 'Polished Artist Statement & Catalog',
+        },
+      },
+      {
+        title: 'Thematic Cohesion Across Multi-Medium Studio Bodies',
+        topicHeading: 'Visual & Conceptual Cohesion in Portfolios',
+        definition:
+          'Thematic cohesion is the unifying visual rhythm, palette restraint, and conceptual resonance that binds disparate studio explorations into a singular gallery-ready portfolio.',
+        majorFunctionsTitle: 'Methods for ensuring portfolio cohesion:',
+        majorFunctions: [
+          'Audit tonal values and chromatic palettes across all prospective pieces.',
+          'Eliminate redundant or discordant studies that weaken curatorial impact.',
+          'Sequence works to create an intentional narrative cadence for gallery visitors.',
+        ],
+        partsTitle: 'Curatorial Review Criteria',
+        parts: [
+          {
+            term: 'Visual Thread',
+            desc: 'A signature mark-making gesture or color harmony present across the entire series.',
+          },
+          {
+            term: 'Focal Centerpiece',
+            desc: 'The primary anchor artwork around which satellite studies and sketches orbit.',
+          },
+        ],
+        diagram: {
+          top: 'Expansive Studio Output',
+          middle1: 'Curatorial Weeding & Value Sorting',
+          middle2: 'Sequence Pacing & Spatial Rhythm',
+          bottom: 'Unified 12-Piece Exhibition Body',
+        },
+      },
+    ],
+    1: [
+      {
+        title: 'Formal Critique Frameworks: Peer Review & Discourse',
+        topicHeading: 'Critique Protocols & Objective Evaluation',
+        definition:
+          'Formal studio critique is an iterative peer evaluation methodology that analyzes composition, craftsmanship, and conceptual depth through structured dialogue rather than subjective taste.',
+        majorFunctionsTitle: 'Standard critique protocol stages:',
+        majorFunctions: [
+          'Observation: Describe formal elements (line, value, shape, texture) objectively.',
+          'Analysis: Deconstruct how elements guide eye movement and establish visual hierarchy.',
+          'Interpretation & Synthesis: Discuss emotional resonance and propose refinements.',
+        ],
+        partsTitle: 'Critique Roles & Etiquette',
+        parts: [
+          {
+            term: 'Presenter Intent',
+            desc: 'Concise 2-minute overview framing specific areas requesting critical feedback.',
+          },
+          {
+            term: 'Actionable Critique',
+            desc: 'Constructive suggestions backed by formal design principles.',
+          },
+        ],
+        diagram: {
+          top: 'Studio Artwork Presentation',
+          middle1: 'Objective Formal Analysis',
+          middle2: 'Peer & Faculty Cross-Examination',
+          bottom: 'Iterative Studio Action Plan',
+        },
+      },
+    ],
+    2: [
+      {
+        title: 'Gallery Staging, Lighting & Exhibition Archiving',
+        topicHeading: 'Exhibition Design & Archival Documentation',
+        definition:
+          'Gallery staging bridges studio production and public reception through intentional wall spacing, calibrated 5000K lighting, hanging mechanics, and museum-grade digital archiving.',
+        majorFunctionsTitle: 'Core exhibition staging standards:',
+        majorFunctions: [
+          'Maintain 58-inch eye-level centerlines across all hung pieces.',
+          'Calibrate warm-neutral directional spot lighting to avoid glare on glazes.',
+          'Capture high-res polarized RAW photographs for monograph publishing.',
+        ],
+        partsTitle: 'Archival Deliverables',
+        parts: [
+          {
+            term: 'Exhibition Pedigree',
+            desc: 'Detailed inventory log detailing dimensions, year, medium, and provenance.',
+          },
+          {
+            term: 'Digital Monograph',
+            desc: '300 DPI print-ready PDF catalog featuring artist statement and curatorial essays.',
+          },
+        ],
+        diagram: {
+          top: 'Finalized Studio Collection',
+          middle1: '58-Inch Centerline Gallery Hanging',
+          middle2: 'Calibrated Polarized Lighting',
+          bottom: 'Permanent Digital & Print Monograph',
+        },
+      },
+    ],
+  },
+  'crs-6': {
+    0: [
+      {
+        title: 'Lines of Action & 30-Second Life Model Gestures',
+        topicHeading: 'Dynamic Gesture Drawing & Rhythms',
+        definition:
+          'Gesture drawing captures the primary force, momentum, and expressive rhythm of the human body in rapid 30-second to 2-minute sketching intervals before committing to anatomy.',
+        majorFunctionsTitle: 'Principles of dynamic gesture sketching:',
+        majorFunctions: [
+          'Establish a single sweeping line of action connecting the head through the supporting heel.',
+          'Identify the torso twist and counter-tilt between shoulders and pelvis.',
+          'Use dynamic tapering strokes to express muscle tension and gravitational weight.',
+        ],
+        partsTitle: 'Essential Gesture Elements',
+        parts: [
+          {
+            term: 'Line of Action',
+            desc: 'The imaginary curved axis that describes the main thrust and direction of the pose.',
+          },
+          {
+            term: 'Opposing Angles',
+            desc: 'The tilt of the shoulder girdle contrasting with the opposite angle of the hip axis.',
+          },
+        ],
+        diagram: {
+          top: 'Live Model Observed Pose',
+          middle1: 'Sweeping Line of Action',
+          middle2: 'Shoulder & Pelvic Counter-Tilt',
+          bottom: 'Complete Dynamic Figure Gesture',
+        },
+      },
+      {
+        title: 'Contrapposto, Weight Tilts, & Center of Gravity',
+        topicHeading: 'Contrapposto Mechanics & Anatomical Balance',
+        definition:
+          'Contrapposto is the natural asymmetrical posture where a figure shifts their weight onto one dominant leg, tilting the hips upward on the load-bearing side and relaxing the opposite limb.',
+        majorFunctionsTitle: 'Mechanical checkpoints of contrapposto:',
+        majorFunctions: [
+          'Drop a vertical plum line from the sternum notch to the inside ankle of the standing leg.',
+          'Angle the pelvis downward toward the free (bent) resting leg.',
+          'Tense the latissimus and obliques on the compressed side of the torso.',
+        ],
+        partsTitle: 'Anatomical Balance Points',
+        parts: [
+          {
+            term: 'Weight-Bearing Leg',
+            desc: 'The locked pillar supporting 85% of bodily weight, aligning under the pelvic center.',
+          },
+          {
+            term: 'Torso Compression Zone',
+            desc: 'The creased lateral side of the waist where shoulder and hip tilts pinch together.',
+          },
+        ],
+        diagram: {
+          top: 'Sternum Notch Plumb Line',
+          middle1: 'Load-Bearing Hip Elevation',
+          middle2: 'Torso Pinch & Stretch Asymmetry',
+          bottom: 'Effortless Grounded Contrapposto Pose',
+        },
+      },
+    ],
+    1: [
+      {
+        title: 'Torso Landmarks: Ribcage, Pelvis, & Spinal Twists',
+        topicHeading: 'Skeletal Landmarks of the Human Torso',
+        definition:
+          'The torso acts as the central mechanical engine of character poses, composed of the rigid ribcage egg, the pelvic bowl, and the flexible lumbar spine connecting them.',
+        majorFunctionsTitle: 'Critical skeletal landmarks to locate first:',
+        majorFunctions: [
+          'The 7th cervical vertebra (C7) and the suprasternal notch at the base of the neck.',
+          'The anterior superior iliac spine (ASIS) points marking the front pelvic crest.',
+          'The spinal furrow terminating at the sacrum triangle.',
+        ],
+        partsTitle: 'Torso Volumes',
+        parts: [
+          {
+            term: 'Thoracic Box',
+            desc: 'The rigid cage protecting heart and lungs, tilting independently of the hips.',
+          },
+          {
+            term: 'Pelvic Cradle',
+            desc: 'The tilted basin that anchors leg sockets and establishes standing balance.',
+          },
+        ],
+        diagram: {
+          top: 'Ribcage Egg vs. Pelvic Bowl',
+          middle1: 'Lumbar Spine Flexibility Arc',
+          middle2: 'Surface Landmark Alignment',
+          bottom: 'Volumetric 3D Torso Block-Out',
+        },
+      },
+    ],
+    2: [
+      {
+        title: 'Silhouette Readability & Exaggerated Dynamic Force',
+        topicHeading: 'Silhouette Readability & Digital Brush Economy',
+        definition:
+          'Silhouette readability ensures a character pose can be instantly recognized and understood purely as a solid black shape, maximizing clarity, attitude, and visual impact.',
+        majorFunctionsTitle: 'Rules for high-clarity silhouettes:',
+        majorFunctions: [
+          'Separate limbs from the torso negative space so gestures do not blob together.',
+          'Exaggerate straights against curves to emphasize muscular tension and bone solidity.',
+          'Use confident single-pass strokes on digital stylus tablets rather than hairy chicken-scratching.',
+        ],
+        partsTitle: 'Contour Systems',
+        parts: [
+          {
+            term: 'Straight vs. Curve',
+            desc: 'Contrasting a tense flat contour with an opposing flexed muscular arc.',
+          },
+          {
+            term: 'Negative Space Window',
+            desc: 'Clear gaps between arms, legs, and torso that clarify the character action.',
+          },
+        ],
+        diagram: {
+          top: 'Complex Digital Underdrawing',
+          middle1: 'Blackout Silhouette Readability Test',
+          middle2: 'Negative Space Optimization',
+          bottom: 'Finished High-Impact Character Plate',
+        },
+      },
+    ],
+  },
 };
 
 export const buildCourseUnitsWithItems = (

@@ -19,7 +19,7 @@ export const INITIAL_USERS = [
     gpa: '3.88',
     streakDays: 14,
     studyHours: 42,
-    enrolledCourseIds: ['crs-1', 'crs-2', 'crs-3'],
+    enrolledCourseIds: ['crs-1', 'crs-2', 'crs-3', 'crs-5', 'crs-6'],
   },
   {
     id: 'usr-2',
@@ -39,7 +39,7 @@ export const INITIAL_USERS = [
     gpa: '3.75',
     streakDays: 9,
     studyHours: 36,
-    enrolledCourseIds: ['crs-1', 'crs-3', 'crs-4'],
+    enrolledCourseIds: ['crs-1', 'crs-3', 'crs-4', 'crs-5'],
   },
   {
     id: 'usr-3',
@@ -54,7 +54,7 @@ export const INITIAL_USERS = [
     department: 'Fine Arts & Applied Media',
     phone: '+1 (555) 304-9821',
     joinedDate: 'August 2024',
-    assignedCourseIds: ['crs-1', 'crs-3'],
+    assignedCourseIds: ['crs-1', 'crs-3', 'crs-5'],
   },
   {
     id: 'usr-4',
@@ -69,7 +69,7 @@ export const INITIAL_USERS = [
     department: 'Digital Arts & Animation',
     phone: '+1 (555) 489-1102',
     joinedDate: 'October 2024',
-    assignedCourseIds: ['crs-2', 'crs-4'],
+    assignedCourseIds: ['crs-2', 'crs-4', 'crs-6'],
   },
   {
     id: 'usr-5',
@@ -229,6 +229,60 @@ export const INITIAL_COURSES = [
       { unit: 'Unit 2', title: 'Caching Strategies & Stale-While-Revalidate', lessons: 12 },
       { unit: 'Unit 3', title: 'Production Performance & Vercel Edge', lessons: 10 }
     ]
+  },
+  {
+    id: 'crs-5',
+    code: 'CRT-210',
+    title: 'Fine Arts Portfolio Seminar',
+    category: 'Fine Arts',
+    instructorId: 'usr-3',
+    instructorName: 'Prof. Alicia Mayer',
+    instructorAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
+    level: 'Intermediate level',
+    duration: '8 Weeks',
+    totalLessons: 16,
+    completedLessons: 8,
+    progress: 50,
+    studentsCount: 54,
+    rating: 4.92,
+    color: '#b45309',
+    badge: 'Studio Critique',
+    thumbnail: 'https://images.unsplash.com/photo-1577083552431-6e5fd01aa342?auto=format&fit=crop&w=600&q=80',
+    description: 'Curate, critique, and refine professional visual portfolios through weekly faculty and peer studio critiques, exhibition staging, and artist statements.',
+    schedule: 'Monday • 2:00 PM - 5:00 PM',
+    room: 'MB 502',
+    syllabus: [
+      { unit: 'Unit 1', title: 'Artist Statement & Visual Cohesion', lessons: 5 },
+      { unit: 'Unit 2', title: 'Studio Critique Protocols & Iterative Refinement', lessons: 6 },
+      { unit: 'Unit 3', title: 'Gallery Staging & Professional Portfolio Archiving', lessons: 5 }
+    ]
+  },
+  {
+    id: 'crs-6',
+    code: 'ILL-302',
+    title: 'Digital Figure Illustration Lab',
+    category: 'Illustration',
+    instructorId: 'usr-4',
+    instructorName: 'Mika Dickens',
+    instructorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
+    level: 'Intermediate level',
+    duration: '10 Weeks',
+    totalLessons: 20,
+    completedLessons: 12,
+    progress: 60,
+    studentsCount: 78,
+    rating: 4.88,
+    color: '#be185d',
+    badge: 'Weekend Studio',
+    thumbnail: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=600&q=80',
+    description: 'Deep-dive weekend workshop on dynamic life drawing, digital tablet gesture capturing, anatomical musculature, and quick-sketch character posing.',
+    schedule: 'Sat & Sun • 11:00 AM - 2:00 PM',
+    room: 'JRF 104',
+    syllabus: [
+      { unit: 'Unit 1', title: 'Dynamic Gesture & Live Model Capturing', lessons: 6 },
+      { unit: 'Unit 2', title: 'Musculature Systems & Torso / Limb Rhythms', lessons: 7 },
+      { unit: 'Unit 3', title: 'Character Pose Expressiveness & Silhouette Weight', lessons: 7 }
+    ]
   }
 ];
 
@@ -314,6 +368,48 @@ export const INITIAL_ASSIGNMENTS = [
       { criteria: 'Nuqta Calibration', points: 50 },
       { criteria: 'Ink Uniformity', points: 25 },
       { criteria: 'Angle of Attack', points: 25 }
+    ],
+    submissionTypes: ['image', 'pdf']
+  },
+  {
+    id: 'asg-5',
+    courseId: 'crs-5',
+    courseName: 'Fine Arts Portfolio Seminar',
+    title: 'Midterm Portfolio Curation & Artist Statement',
+    description: 'Compile a curated selection of 6 cohesive studio works with an accompanying 400-word artist statement reflecting conceptual themes and medium techniques.',
+    publishedAt: '2026-10-10',
+    dueDate: '2026-10-27',
+    dueTime: '11:59 PM',
+    duration: '3 hours',
+    maxScore: 100,
+    priority: 'High',
+    priorityColor: 'gold',
+    status: 'Pending',
+    rubric: [
+      { criteria: 'Curatorial Cohesion', points: 35 },
+      { criteria: 'Artist Statement Clarity', points: 35 },
+      { criteria: 'Documentation & Presentation', points: 30 }
+    ],
+    submissionTypes: ['pdf', 'link']
+  },
+  {
+    id: 'asg-6',
+    courseId: 'crs-6',
+    courseName: 'Digital Figure Illustration Lab',
+    title: 'Weekend 2-Minute Gesture & Pose Sequence',
+    description: 'Submit a contact sheet of fifteen 2-minute dynamic digital figure sketches exploring rhythm lines, weight shifts (contrapposto), and expressive silhouette contours.',
+    publishedAt: '2026-10-12',
+    dueDate: '2026-10-25',
+    dueTime: '11:59 PM',
+    duration: '2 hours',
+    maxScore: 100,
+    priority: 'Medium',
+    priorityColor: 'sage',
+    status: 'Pending',
+    rubric: [
+      { criteria: 'Line of Action & Rhythm', points: 40 },
+      { criteria: 'Proportional Weight & Balance', points: 30 },
+      { criteria: 'Contour Economy & Line Weight', points: 30 }
     ],
     submissionTypes: ['image', 'pdf']
   }
@@ -462,6 +558,30 @@ export const INITIAL_MATERIALS = [
     uploadedBy: 'Prof. Alicia Mayer',
     downloadUrl: '#',
     description: '15-minute demonstration on trimming Jawi reed pens at a 35-degree angle.'
+  },
+  {
+    id: 'mat-6',
+    courseId: 'crs-5',
+    courseTitle: 'Fine Arts Portfolio Seminar',
+    title: 'Portfolio Curation Standards & Gallery Layout Guide',
+    type: 'pdf',
+    size: '5.2 MB',
+    uploadDate: '2026-10-01',
+    uploadedBy: 'Prof. Alicia Mayer',
+    downloadUrl: '#',
+    description: 'Guidelines on formatting high-resolution image plates, exhibition catalogs, and lighting arrangements.'
+  },
+  {
+    id: 'mat-7',
+    courseId: 'crs-6',
+    courseTitle: 'Digital Figure Illustration Lab',
+    title: 'Figure Anatomy Landmarks & Contrapposto Cheatsheet',
+    type: 'pdf',
+    size: '8.1 MB',
+    uploadDate: '2026-10-05',
+    uploadedBy: 'Mika Dickens',
+    downloadUrl: '#',
+    description: 'Visual reference guide detailing major skeletal landmarks, pelvis tilting, and quick line-of-action workflows.'
   }
 ];
 
@@ -512,6 +632,7 @@ export const INITIAL_SCHEDULE = [
     id: 'sch-1',
     code: 'ART-201',
     title: 'Modern Art & Expression',
+    courseId: 'crs-1',
     course: 'Modern Art & Contemporary Expression',
     days: ['Monday', 'Wednesday'],
     day: 'Mon, Wed',
@@ -527,6 +648,7 @@ export const INITIAL_SCHEDULE = [
     id: 'sch-2',
     code: 'DSN-340',
     title: 'Advanced Sketching',
+    courseId: 'crs-2',
     course: 'Advanced Sketching & Anatomy',
     days: ['Monday', 'Wednesday'],
     day: 'Mon, Wed',
@@ -542,6 +664,7 @@ export const INITIAL_SCHEDULE = [
     id: 'sch-3',
     code: 'TYP-105',
     title: 'Typography & Letterform',
+    courseId: 'crs-3',
     course: 'Arabic Calligraphy & Letterform Craft',
     days: ['Tuesday', 'Thursday'],
     day: 'Tue, Thu',
@@ -557,6 +680,7 @@ export const INITIAL_SCHEDULE = [
     id: 'sch-4',
     code: 'DEV-410',
     title: 'UI Architecture Lab',
+    courseId: 'crs-4',
     course: 'Cache Up: UI Architecture & Systems',
     days: ['Friday'],
     day: 'Friday',
@@ -572,6 +696,7 @@ export const INITIAL_SCHEDULE = [
     id: 'sch-5',
     code: 'CRT-210',
     title: 'Studio Critique',
+    courseId: 'crs-5',
     course: 'Fine Arts Portfolio Seminar',
     days: ['Monday'],
     day: 'Monday',
@@ -587,7 +712,8 @@ export const INITIAL_SCHEDULE = [
     id: 'sch-6',
     code: 'ILL-302',
     title: 'Digital Figure Lab',
-    course: 'Advanced Sketching & Anatomy',
+    courseId: 'crs-6',
+    course: 'Digital Figure Illustration Lab',
     days: ['Saturday', 'Sunday'],
     day: 'Sat, Sun',
     startTime: '11:00',
