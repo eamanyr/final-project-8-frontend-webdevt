@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLMS } from '../../context/LMSContext';
-import { ArrowLeft, Plus, Trash2, Save, FileCheck2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, FileCheck2, Sliders, Check } from 'lucide-react';
 
 export const AssignmentForm = () => {
-  const { courses, currentUser, addAssignment, setActiveTab, setSelectedAssignmentId } = useLMS();
+  const {
+    courses,
+    currentUser,
+    assignments,
+    addAssignment,
+    updateAssignment,
+    setActiveTab,
+    selectedAssignmentId,
+    setSelectedAssignmentId,
+  } = useLMS();
 
   const isTeacher = currentUser?.role === 'teacher';
   const availableCourses = isTeacher
@@ -12,12 +21,15 @@ export const AssignmentForm = () => {
       )
     : courses;
 
+  const [mode, setMode] = useState('create'); // 'create' | 'edit'
+  const [selectedEditId, setSelectedEditId] = useState(selectedAssignmentId || assignments[0]?.id || '');
+
   const [formData, setFormData] = useState({
     courseId: availableCourses[0]?.id || 'crs-1',
     unitIdx: 0,
     title: '',
     description: '',
-    dueDate: '2026-10-30',
+    dueDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
     dueTime: '11:59 PM',
     duration: '2 hours 30 min',
     maxScore: 100,
@@ -29,17 +41,69 @@ export const AssignmentForm = () => {
     ],
   });
 
+  // If in edit mode, populate form
+  const handleSelectEditAssignment = (asgId) => {
+    setSelectedEditId(asgId);
+    const target = assignments.find((a) => a.id === asgId);
+    if (target) {
+      setFormData({
+        courseId: target.courseId || availableCourses[0]?.id || 'crs-1',
+        unitIdx: target.unitIdx !== undefined ? target.unitIdx : 0,
+        title: target.title || '',
+        description: target.description || '',
+        dueDate: target.dueDate || new Date().toISOString().slice(0, 10),
+        dueTime: target.dueTime || '11:59 PM',
+        duration: target.duration || '2 hours',
+        maxScore: target.maxScore || 100,
+        priority: target.priority || 'Medium',
+        rubric: target.rubric && target.rubric.length
+          ? target.rubric
+          : [
+              { criteria: 'Technical Execution & Precision', points: 40 },
+              { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
+              { criteria: 'Documentation & Presentation', points: 25 },
+            ],
+      });
+    }
+  };
+
   const handleAddRubricItem = () => {
-    setFormData({
-      ...formData,
-      rubric: [...formData.rubric, { criteria: 'Additional Studio Criterion', points: 10 }],
+    setFormData((prev) => {
+      const updatedRubric = [...prev.rubric, { criteria: 'New Studio Criterion', points: 10 }];
+      const sum = updatedRubric.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
+      return {
+        ...prev,
+        rubric: updatedRubric,
+        maxScore: sum,
+      };
     });
   };
 
   const handleRemoveRubricItem = (idx) => {
-    setFormData({
-      ...formData,
-      rubric: formData.rubric.filter((_, i) => i !== idx),
+    setFormData((prev) => {
+      const updatedRubric = prev.rubric.filter((_, i) => i !== idx);
+      const sum = updatedRubric.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
+      return {
+        ...prev,
+        rubric: updatedRubric,
+        maxScore: sum > 0 ? sum : prev.maxScore,
+      };
+    });
+  };
+
+  const handleRubricChange = (idx, field, value) => {
+    setFormData((prev) => {
+      const updated = [...prev.rubric];
+      updated[idx] = {
+        ...updated[idx],
+        [field]: field === 'points' ? Math.max(0, parseInt(value) || 0) : value,
+      };
+      const sum = updated.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
+      return {
+        ...prev,
+        rubric: updated,
+        maxScore: sum > 0 ? sum : prev.maxScore,
+      };
     });
   };
 
@@ -49,26 +113,69 @@ export const AssignmentForm = () => {
       alert('Please fill in assignment title and description.');
       return;
     }
-    const created = addAssignment({
+
+    const totalRubricPts = formData.rubric.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
+    const finalMaxScore = totalRubricPts > 0 ? totalRubricPts : parseInt(formData.maxScore) || 100;
+
+    const payload = {
       ...formData,
+      maxScore: finalMaxScore,
       unitIdx: Number(formData.unitIdx) || 0,
-    });
-    if (created?.id) setSelectedAssignmentId(created.id);
+    };
+
+    if (mode === 'edit' && selectedEditId) {
+      updateAssignment(selectedEditId, payload);
+      setSelectedAssignmentId(selectedEditId);
+    } else {
+      const created = addAssignment(payload);
+      if (created?.id) setSelectedAssignmentId(created.id);
+    }
+
     setActiveTab('assignment-details');
   };
 
   const selectedCourseObj = availableCourses.find((c) => c.id === formData.courseId) || availableCourses[0];
+  const totalRubricPoints = formData.rubric.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
         <button
           onClick={() => setActiveTab('assignments')}
-          className="inline-flex items-center gap-2 text-xs font-bold text-charcoal hover:text-forest transition-colors"
+          className="inline-flex items-center gap-2 text-xs font-bold text-charcoal hover:text-forest transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Cancel & Back to Assignments</span>
+          <span>Cancel &amp; Back to Assignments</span>
         </button>
+
+        {/* Mode Switcher: Create New or Edit Existing */}
+        <div className="flex items-center gap-1.5 p-1 bg-white rounded-2xl border border-charcoal/10 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setMode('create')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              mode === 'create'
+                ? 'bg-forest text-cream shadow-2xs'
+                : 'text-charcoal-muted hover:text-charcoal'
+            }`}
+          >
+            Create New
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('edit');
+              handleSelectEditAssignment(selectedEditId || assignments[0]?.id);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              mode === 'edit'
+                ? 'bg-forest text-cream shadow-2xs'
+                : 'text-charcoal-muted hover:text-charcoal'
+            }`}
+          >
+            Edit Existing
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-charcoal/10 shadow-xs">
@@ -78,13 +185,32 @@ export const AssignmentForm = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-charcoal font-heading">
-              Create / Edit Assignment
+              {mode === 'edit' ? 'Edit Assignment & Criteria' : 'Create Assignment & Define Criteria'}
             </h2>
             <p className="text-xs text-charcoal-muted mt-0.5">
-              Publish student tasks, submission rubrics, and deadlines
+              Publish student tasks, evaluate rubrics, and configure deadline points
             </p>
           </div>
         </div>
+
+        {mode === 'edit' && (
+          <div className="mb-5 p-3.5 rounded-2xl bg-cream/40 border border-charcoal/10">
+            <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
+              Select Assignment to Modify
+            </label>
+            <select
+              value={selectedEditId}
+              onChange={(e) => handleSelectEditAssignment(e.target.value)}
+              className="w-full bg-white border border-charcoal/15 rounded-xl px-3 py-2 text-xs font-semibold text-charcoal focus:outline-hidden focus:border-forest"
+            >
+              {assignments.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.title} ({a.courseName || 'Course'})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -95,7 +221,7 @@ export const AssignmentForm = () => {
               <select
                 value={formData.courseId}
                 onChange={(e) => setFormData({ ...formData, courseId: e.target.value, unitIdx: 0 })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 font-semibold"
+                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest font-semibold"
               >
                 {availableCourses.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -112,7 +238,7 @@ export const AssignmentForm = () => {
               <select
                 value={formData.unitIdx}
                 onChange={(e) => setFormData({ ...formData, unitIdx: Number(e.target.value) })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 font-semibold"
+                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest font-semibold"
               >
                 {(selectedCourseObj?.syllabus || []).map((u, uIdx) => (
                   <option key={uIdx} value={uIdx}>
@@ -132,7 +258,7 @@ export const AssignmentForm = () => {
                 placeholder="e.g. Dynamic Balance & Typography Poster"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 font-semibold"
+                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest font-semibold"
               />
             </div>
           </div>
@@ -147,7 +273,7 @@ export const AssignmentForm = () => {
                 required
                 value={formData.dueDate}
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest"
               />
             </div>
 
@@ -160,7 +286,7 @@ export const AssignmentForm = () => {
                 value={formData.dueTime}
                 onChange={(e) => setFormData({ ...formData, dueTime: e.target.value })}
                 placeholder="11:59 PM"
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest"
               />
             </div>
 
@@ -174,7 +300,7 @@ export const AssignmentForm = () => {
                 max="500"
                 value={formData.maxScore}
                 onChange={(e) => setFormData({ ...formData, maxScore: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 font-bold"
+                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest font-bold"
               />
             </div>
 
@@ -185,7 +311,7 @@ export const AssignmentForm = () => {
               <select
                 value={formData.priority}
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest"
               >
                 <option value="High">High Priority</option>
                 <option value="Medium">Medium Priority</option>
@@ -196,7 +322,7 @@ export const AssignmentForm = () => {
 
           <div>
             <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
-              Instructions & Deliverables
+              Instructions &amp; Deliverables
             </label>
             <textarea
               rows={4}
@@ -204,20 +330,25 @@ export const AssignmentForm = () => {
               placeholder="Detail assignment steps, technical expectations, source material citations..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 resize-none leading-relaxed"
+              className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest resize-none leading-relaxed"
             />
           </div>
 
-          {/* Rubric Criteria Builder */}
+          {/* Rubric Criteria Builder & Modifier */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-bold text-charcoal uppercase tracking-wider">
-                Evaluation Rubric Breakdown
-              </label>
+              <div>
+                <label className="block text-xs font-bold text-charcoal uppercase tracking-wider">
+                  Evaluation Rubric &amp; Criteria Breakdown
+                </label>
+                <p className="text-[11px] text-charcoal-muted">
+                  Add, customize, or remove criteria. Total points will update dynamically.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={handleAddRubricItem}
-                className="inline-flex items-center gap-1 text-xs font-bold text-forest hover:text-gold"
+                className="inline-flex items-center gap-1 text-xs font-bold text-forest hover:text-gold cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Criterion</span>
@@ -233,32 +364,25 @@ export const AssignmentForm = () => {
                   <input
                     type="text"
                     value={r.criteria}
-                    onChange={(e) => {
-                      const updated = [...formData.rubric];
-                      updated[idx].criteria = e.target.value;
-                      setFormData({ ...formData, rubric: updated });
-                    }}
-                    placeholder="Criteria name"
-                    className="flex-1 bg-white border border-charcoal/10 rounded-lg px-2.5 py-1 text-xs text-charcoal focus:outline-none"
+                    onChange={(e) => handleRubricChange(idx, 'criteria', e.target.value)}
+                    placeholder="Criteria name or description"
+                    className="flex-1 bg-white border border-charcoal/10 rounded-lg px-2.5 py-1.5 text-xs text-charcoal focus:outline-hidden focus:border-forest font-medium"
                   />
                   <input
                     type="number"
                     min="1"
                     max="100"
                     value={r.points}
-                    onChange={(e) => {
-                      const updated = [...formData.rubric];
-                      updated[idx].points = parseInt(e.target.value) || 0;
-                      setFormData({ ...formData, rubric: updated });
-                    }}
-                    className="w-20 bg-white border border-charcoal/10 rounded-lg px-2 py-1 text-xs text-charcoal text-center font-bold"
+                    onChange={(e) => handleRubricChange(idx, 'points', e.target.value)}
+                    className="w-20 bg-white border border-charcoal/10 rounded-lg px-2 py-1.5 text-xs text-charcoal text-center font-bold font-mono focus:outline-hidden focus:border-forest"
                   />
-                  <span className="text-[11px] text-charcoal-muted">Pts</span>
+                  <span className="text-[11px] text-charcoal-muted font-semibold">Pts</span>
                   {formData.rubric.length > 1 && (
                     <button
                       type="button"
                       onClick={() => handleRemoveRubricItem(idx)}
-                      className="p-1 text-charcoal-muted hover:text-red-600"
+                      className="p-1 text-charcoal-muted hover:text-red-600 transition-colors cursor-pointer"
+                      title="Remove criterion"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -266,22 +390,29 @@ export const AssignmentForm = () => {
                 </div>
               ))}
             </div>
+
+            <div className="mt-2.5 flex items-center justify-between text-xs text-charcoal-muted">
+              <span>{formData.rubric.length} criteria defined</span>
+              <span className="font-bold text-forest font-mono">
+                Total Criteria Points: {totalRubricPoints} pts
+              </span>
+            </div>
           </div>
 
           <div className="pt-4 border-t border-charcoal/10 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => setActiveTab('assignments')}
-              className="px-5 py-2.5 rounded-xl border border-charcoal/20 text-xs font-bold text-charcoal hover:bg-cream"
+              className="px-5 py-2.5 rounded-xl border border-charcoal/20 text-xs font-bold text-charcoal hover:bg-cream cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all shadow-md shadow-forest/20 flex items-center gap-1.5"
+              className="px-6 py-2.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all shadow-md shadow-forest/20 flex items-center gap-1.5 cursor-pointer"
             >
-              <Save className="w-4 h-4" />
-              <span>Publish Assignment</span>
+              <Save className="w-4 h-4 text-gold" />
+              <span>{mode === 'edit' ? 'Save Assignment Changes' : 'Publish Assignment'}</span>
             </button>
           </div>
         </form>

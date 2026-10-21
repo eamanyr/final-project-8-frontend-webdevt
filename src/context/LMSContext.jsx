@@ -14,6 +14,8 @@ import {
   INITIAL_REMINDERS,
   INITIAL_MEETINGS,
   INITIAL_COURSE_RATINGS,
+  INITIAL_QUIZZES,
+  INITIAL_QUIZ_SUBMISSIONS,
 } from '../data/mockData';
 import { getDefaultUnitLessons } from '../data/courseCurriculum';
 
@@ -148,6 +150,36 @@ export const LMSProvider = ({ children }) => {
   const [announcements, setAnnouncements] = useState(() => {
     const saved = localStorage.getItem('cacheup_announcements');
     return saved ? JSON.parse(saved) : INITIAL_ANNOUNCEMENTS;
+  });
+
+  const [quizzes, setQuizzes] = useState(() => {
+    const saved = localStorage.getItem('cacheup_quizzes');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const existingIds = new Set(parsed.map((q) => q.id));
+        const missing = INITIAL_QUIZZES.filter((q) => !existingIds.has(q.id));
+        return [...parsed, ...missing];
+      } catch {
+        return INITIAL_QUIZZES;
+      }
+    }
+    return INITIAL_QUIZZES;
+  });
+
+  const [quizSubmissions, setQuizSubmissions] = useState(() => {
+    const saved = localStorage.getItem('cacheup_quiz_submissions');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const existingIds = new Set(parsed.map((s) => s.id));
+        const missing = INITIAL_QUIZ_SUBMISSIONS.filter((s) => !existingIds.has(s.id));
+        return [...parsed, ...missing];
+      } catch {
+        return INITIAL_QUIZ_SUBMISSIONS;
+      }
+    }
+    return INITIAL_QUIZ_SUBMISSIONS;
   });
 
   const [customLessons, setCustomLessons] = useState(() => {
@@ -369,6 +401,14 @@ export const LMSProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('cacheup_announcements', JSON.stringify(announcements));
   }, [announcements]);
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_quizzes', JSON.stringify(quizzes));
+  }, [quizzes]);
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_quiz_submissions', JSON.stringify(quizSubmissions));
+  }, [quizSubmissions]);
 
   useEffect(() => {
     localStorage.setItem('cacheup_schedule', JSON.stringify(schedule));
@@ -1047,18 +1087,22 @@ export const LMSProvider = ({ children }) => {
       assignmentId: data.assignmentId,
       assignmentTitle: assignment ? assignment.title : 'Assignment',
       courseId: assignment ? assignment.courseId : 'crs-1',
-      studentId: currentUser.id,
-      studentName: currentUser.name,
-      studentAvatar: currentUser.avatar,
+      courseName: assignment?.courseName || 'Course',
+      studentId: currentUser?.id || 'usr-1',
+      studentName: currentUser?.name || 'Student',
+      studentAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
       submissionDate: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      submissionType: data.submissionType || (data.linkUrl ? 'link' : data.fileName ? 'file' : 'text'),
       content: data.content || '',
       linkUrl: data.linkUrl || '',
-      fileName: data.fileName || 'Assignment_Submission.pdf',
-      fileSize: data.fileSize || '2.8 MB',
+      fileName: data.fileName || (data.submissionType === 'file' ? 'Assignment_Submission.pdf' : ''),
+      fileSize: data.fileSize || (data.submissionType === 'file' ? '2.8 MB' : ''),
+      fileUrl: data.fileUrl || '',
       status: 'Submitted',
       score: null,
       maxScore: assignment?.maxScore || 100,
       feedback: '',
+      rubricScores: null,
       gradedBy: null,
       gradedAt: null
     };
@@ -1068,7 +1112,7 @@ export const LMSProvider = ({ children }) => {
     return newSub;
   };
 
-  const gradeSubmission = (subId, score, feedback) => {
+  const gradeSubmission = (subId, score, feedback, rubricScores = null) => {
     setSubmissions((prev) =>
       prev.map((s) => {
         if (s.id === subId) {
@@ -1076,6 +1120,7 @@ export const LMSProvider = ({ children }) => {
             ...s,
             score: parseInt(score),
             feedback,
+            rubricScores: rubricScores !== null ? rubricScores : s.rubricScores,
             status: 'Graded',
             gradedBy: currentUser?.name || 'Prof. Alicia Mayer',
             gradedAt: new Date().toISOString().replace('T', ' ').slice(0, 16)
@@ -1085,6 +1130,111 @@ export const LMSProvider = ({ children }) => {
       })
     );
     addToast('Grade and constructive feedback recorded!', 'success');
+  };
+
+  // Multiple Choice Quiz actions
+  const addQuiz = (data) => {
+    const course = courses.find((c) => c.id === data.courseId);
+    const questions = data.questions || [];
+    const totalPoints = questions.reduce((acc, q) => acc + (Number(q.points) || 10), 0);
+    const newQuiz = {
+      id: `quiz-${Date.now()}`,
+      courseId: data.courseId,
+      courseName: course ? course.title : (data.courseName || 'Course Assessment'),
+      unitIdx: data.unitIdx !== undefined && data.unitIdx !== '' ? Number(data.unitIdx) : 0,
+      title: data.title || 'Multiple Choice Quiz',
+      description: data.description || 'Answer the following multiple choice questions.',
+      dueDate: data.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+      dueTime: data.dueTime || '11:59 PM',
+      duration: data.duration || (data.timeLimitMinutes ? `${data.timeLimitMinutes} minutes` : '20 minutes'),
+      timeLimitMinutes: Number(data.timeLimitMinutes) || 20,
+      passingScorePercent: Number(data.passingScorePercent) || 70,
+      totalPoints: totalPoints || Number(data.totalPoints) || 40,
+      status: 'Active',
+      publishedAt: new Date().toISOString().slice(0, 10),
+      questions: questions.length > 0 ? questions : [
+        {
+          id: `q-${Date.now()}-1`,
+          prompt: 'Enter your multiple choice question here...',
+          points: 10,
+          options: ['Option A', 'Option B', 'Option C', 'Option D'],
+          correctOptionIndex: 0,
+          explanation: 'Explanation for correct choice.'
+        }
+      ]
+    };
+
+    setQuizzes((prev) => [...prev, newQuiz]);
+    addToast(`Quiz "${newQuiz.title}" created successfully!`, 'success');
+    return newQuiz;
+  };
+
+  const updateQuiz = (id, data) => {
+    setQuizzes((prev) =>
+      prev.map((q) => {
+        if (q.id !== id) return q;
+        const course = data.courseId ? courses.find((c) => c.id === data.courseId) : null;
+        const questions = data.questions !== undefined ? data.questions : q.questions;
+        const totalPoints = questions.reduce((acc, item) => acc + (Number(item.points) || 10), 0);
+        return {
+          ...q,
+          ...data,
+          courseName: course ? course.title : q.courseName,
+          questions,
+          totalPoints: totalPoints || data.totalPoints || q.totalPoints,
+          unitIdx: data.unitIdx !== undefined ? Number(data.unitIdx) : q.unitIdx
+        };
+      })
+    );
+    addToast('Quiz updated successfully.', 'success');
+  };
+
+  const deleteQuiz = (id) => {
+    setQuizzes((prev) => prev.filter((q) => q.id !== id));
+    setQuizSubmissions((prev) => prev.filter((s) => s.quizId !== id));
+    addToast('Quiz removed.', 'info');
+  };
+
+  const submitQuiz = (data) => {
+    const quiz = quizzes.find((q) => q.id === data.quizId);
+    let earnedScore = 0;
+    const maxScore = quiz?.totalPoints || 100;
+
+    if (quiz && quiz.questions) {
+      quiz.questions.forEach((q) => {
+        const studentChoice = data.answers?.[q.id];
+        if (studentChoice !== undefined && studentChoice === q.correctOptionIndex) {
+          earnedScore += Number(q.points) || 10;
+        }
+      });
+    } else {
+      earnedScore = data.score || 0;
+    }
+
+    const percentage = maxScore > 0 ? Math.round((earnedScore / maxScore) * 100) : 100;
+    const passed = percentage >= (quiz?.passingScorePercent || 70);
+
+    const newSub = {
+      id: `qsub-${Date.now()}`,
+      quizId: data.quizId,
+      quizTitle: quiz ? quiz.title : 'Quiz Assessment',
+      courseId: quiz ? quiz.courseId : 'crs-1',
+      courseName: quiz ? quiz.courseName : 'Course',
+      studentId: currentUser?.id || 'usr-1',
+      studentName: currentUser?.name || 'Student',
+      studentAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      submittedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      answers: data.answers || {},
+      score: earnedScore,
+      maxScore,
+      percentage,
+      passed,
+      timeSpent: data.timeSpent || 'Completed'
+    };
+
+    setQuizSubmissions((prev) => [newSub, ...prev]);
+    addToast(`Quiz submitted! Your score: ${earnedScore}/${maxScore} (${percentage}%)`, passed ? 'success' : 'info');
+    return newSub;
   };
 
   // Learning Materials actions
@@ -1469,6 +1619,8 @@ export const LMSProvider = ({ children }) => {
     setCourses(INITIAL_COURSES);
     setAssignments(INITIAL_ASSIGNMENTS);
     setSubmissions(INITIAL_SUBMISSIONS);
+    setQuizzes(INITIAL_QUIZZES);
+    setQuizSubmissions(INITIAL_QUIZ_SUBMISSIONS);
     setMaterials(INITIAL_MATERIALS);
     setAnnouncements(INITIAL_ANNOUNCEMENTS);
     setUserSchedules(INITIAL_USER_SCHEDULES);
@@ -1516,6 +1668,8 @@ export const LMSProvider = ({ children }) => {
         customLessons,
         assignments,
         submissions,
+        quizzes,
+        quizSubmissions,
         materials,
         announcements,
         schedule,
@@ -1552,6 +1706,12 @@ export const LMSProvider = ({ children }) => {
         moveAssignmentToIndex,
         submitAssignment,
         gradeSubmission,
+
+        // Quiz management
+        addQuiz,
+        updateQuiz,
+        deleteQuiz,
+        submitQuiz,
 
         // Materials, Announcements & Schedule
         addMaterial,

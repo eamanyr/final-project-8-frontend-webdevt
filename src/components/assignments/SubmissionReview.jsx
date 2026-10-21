@@ -693,14 +693,16 @@ const SubmissionCard = ({ submission, onGrade, addToast }) => {
               {submission.fileName && (
                 <button
                   type="button"
-                  onClick={() => addToast(`Opening file: ${submission.fileName}`, 'info')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-charcoal text-[11px] font-mono border border-charcoal/10 hover:border-forest/40 transition-colors shadow-2xs cursor-pointer"
+                  onClick={onGrade}
+                  title="Click to view submitted file, grade, and comment"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-forest/5 text-forest text-[11px] font-mono border border-forest/20 hover:bg-forest/10 transition-colors shadow-2xs cursor-pointer font-bold"
                 >
                   <FileText className="w-3.5 h-3.5 text-forest" />
                   <span>{submission.fileName}</span>
                   {submission.fileSize && (
                     <span className="text-charcoal-muted">({submission.fileSize})</span>
                   )}
+                  <span className="text-[10px] text-forest underline ml-1">View File &amp; Grade →</span>
                 </button>
               )}
 

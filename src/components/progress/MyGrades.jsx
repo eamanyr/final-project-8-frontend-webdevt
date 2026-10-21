@@ -8,11 +8,11 @@ import {
   Clock,
   MessageSquare,
   TrendingUp,
-  FileText
+  HelpCircle,
 } from 'lucide-react';
 
 export const MyGrades = () => {
-  const { currentUser, submissions, assignments, courses } = useLMS();
+  const { currentUser, submissions, assignments, courses, quizSubmissions } = useLMS();
 
   // Find all submissions by this student
   const studentSubmissions = submissions.filter(
@@ -21,9 +21,17 @@ export const MyGrades = () => {
 
   const gradedSubmissions = studentSubmissions.filter((s) => s.status === 'Graded');
 
+  const studentQuizSubs = (quizSubmissions || []).filter(
+    (s) => s.studentId === currentUser?.id
+  );
+
   // Calculate cumulative average
-  const totalScore = gradedSubmissions.reduce((acc, s) => acc + (s.score || 0), 0);
-  const totalMax = gradedSubmissions.reduce((acc, s) => acc + (s.maxScore || 100), 0);
+  const totalScore =
+    gradedSubmissions.reduce((acc, s) => acc + (s.score || 0), 0) +
+    studentQuizSubs.reduce((acc, q) => acc + (q.score || 0), 0);
+  const totalMax =
+    gradedSubmissions.reduce((acc, s) => acc + (s.maxScore || 100), 0) +
+    studentQuizSubs.reduce((acc, q) => acc + (q.maxScore || 100), 0);
   const avgPercentage = totalMax > 0 ? ((totalScore / totalMax) * 100).toFixed(1) : '92.5';
 
   const getLetterGrade = (score, max = 100) => {
@@ -151,6 +159,75 @@ export const MyGrades = () => {
                             Awaiting professor critique...
                           </span>
                         )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Quiz Assessments Gradebook */}
+      <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+        <div className="flex items-center gap-2 mb-4">
+          <HelpCircle className="w-5 h-5 text-purple-700" />
+          <h3 className="text-base font-bold font-heading text-charcoal">
+            Multiple Choice Quiz Gradebook
+          </h3>
+        </div>
+
+        {studentQuizSubs.length === 0 ? (
+          <div className="text-center py-8 text-charcoal-muted text-xs">
+            No quiz attempts recorded yet. You can take unit quizzes directly in your course syllabus!
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-charcoal/10 text-charcoal-muted uppercase text-[10px] tracking-wider">
+                  <th className="pb-3 font-bold">Quiz Assessment</th>
+                  <th className="pb-3 font-bold">Course</th>
+                  <th className="pb-3 font-bold">Submitted Date</th>
+                  <th className="pb-3 font-bold">Score</th>
+                  <th className="pb-3 font-bold">Grade</th>
+                  <th className="pb-3 font-bold">Outcome</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-charcoal/5">
+                {studentQuizSubs.map((qSub) => {
+                  const letter = getLetterGrade(qSub.score, qSub.maxScore);
+
+                  return (
+                    <tr key={qSub.id} className="hover:bg-cream/30 transition-colors">
+                      <td className="py-4 font-bold text-charcoal">
+                        {qSub.quizTitle}
+                      </td>
+                      <td className="py-4 text-charcoal-muted">
+                        {qSub.courseName}
+                      </td>
+                      <td className="py-4 text-charcoal-muted">
+                        {qSub.submittedAt}
+                      </td>
+                      <td className="py-4 font-mono font-bold text-charcoal">
+                        {qSub.score} / {qSub.maxScore} pts ({qSub.percentage}%)
+                      </td>
+                      <td className="py-4">
+                        <span className="px-2.5 py-1 rounded-lg bg-forest/10 text-forest font-extrabold text-xs">
+                          {letter}
+                        </span>
+                      </td>
+                      <td className="py-4">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            qSub.passed
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {qSub.passed ? 'Passed' : 'Needs Review'}
+                        </span>
                       </td>
                     </tr>
                   );

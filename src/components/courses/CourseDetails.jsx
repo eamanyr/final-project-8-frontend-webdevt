@@ -33,7 +33,10 @@ import {
   Image as ImageIcon,
   Trash2,
   X,
+  HelpCircle,
 } from 'lucide-react';
+import { QuizModal } from '../quizzes/QuizModal';
+import { QuizTakeModal } from '../quizzes/QuizTakeModal';
 
 export const CourseDetails = () => {
   const {
@@ -69,7 +72,9 @@ export const CourseDetails = () => {
     setActiveTab,
     toggleEnrollCourse,
     setSelectedAssignmentId,
-    setAssignmentOrigin,
+    quizzes,
+    quizSubmissions,
+    deleteQuiz,
     addToast,
     courseMeetings,
     saveCourseMeeting,
@@ -80,6 +85,12 @@ export const CourseDetails = () => {
   const [openUnits, setOpenUnits] = useState({ 0: true, 1: true, 2: true });
   const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Quiz Modal states
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+  const [editingQuiz, setEditingQuiz] = useState(null);
+  const [selectedUnitIdxForQuiz, setSelectedUnitIdxForQuiz] = useState(0);
+  const [activeTakingQuiz, setActiveTakingQuiz] = useState(null);
   const [meetingForm, setMeetingForm] = useState({
     title: '',
     meetUrl: '',
@@ -120,6 +131,11 @@ export const CourseDetails = () => {
     maxScore: 100,
     priority: 'Medium',
     submissionTypes: ['pdf', 'link'],
+    rubric: [
+      { criteria: 'Technical Execution & Precision', points: 40 },
+      { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
+      { criteria: 'Documentation & Presentation', points: 25 },
+    ],
   });
 
   // Modal states for materials
@@ -359,6 +375,19 @@ export const CourseDetails = () => {
     setOpenUnits((prev) => ({ ...prev, [selectedUnitIdxForLesson]: true }));
   };
 
+  // Quiz Handlers
+  const handleOpenAddQuizModal = (unitIdx = 0) => {
+    setSelectedUnitIdxForQuiz(Number(unitIdx) || 0);
+    setEditingQuiz(null);
+    setIsQuizModalOpen(true);
+  };
+
+  const handleOpenEditQuizModal = (quiz) => {
+    setSelectedUnitIdxForQuiz(quiz.unitIdx !== undefined ? Number(quiz.unitIdx) : 0);
+    setEditingQuiz(quiz);
+    setIsQuizModalOpen(true);
+  };
+
   // Assignment Handlers
   const handleOpenAddAssignmentModal = (unitIdx = 0) => {
     const targetIdx = Number(unitIdx) || 0;
@@ -374,6 +403,11 @@ export const CourseDetails = () => {
       maxScore: 100,
       priority: 'Medium',
       submissionTypes: ['pdf', 'link'],
+      rubric: [
+        { criteria: 'Technical Execution & Precision', points: 40 },
+        { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
+        { criteria: 'Documentation & Presentation', points: 25 },
+      ],
     });
     setIsAssignmentModalOpen(true);
   };
@@ -391,6 +425,11 @@ export const CourseDetails = () => {
       maxScore: asg.maxScore || 100,
       priority: asg.priority || 'Medium',
       submissionTypes: asg.submissionTypes || ['pdf', 'link'],
+      rubric: asg.rubric && asg.rubric.length ? asg.rubric : [
+        { criteria: 'Technical Execution & Precision', points: 40 },
+        { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
+        { criteria: 'Documentation & Presentation', points: 25 },
+      ],
     });
     setIsAssignmentModalOpen(true);
   };
@@ -402,6 +441,9 @@ export const CourseDetails = () => {
       return;
     }
 
+    const totalRubricPts = assignmentFormData.rubric.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
+    const finalMaxScore = totalRubricPts > 0 ? totalRubricPts : parseInt(assignmentFormData.maxScore) || 100;
+
     const payload = {
       courseId: course.id,
       courseName: course.title,
@@ -410,9 +452,10 @@ export const CourseDetails = () => {
       description: assignmentFormData.description.trim() || 'Complete the assigned task and submit your work.',
       dueDate: assignmentFormData.dueDate,
       dueTime: assignmentFormData.dueTime || '11:59 PM',
-      maxScore: parseInt(assignmentFormData.maxScore) || 100,
+      maxScore: finalMaxScore,
       priority: assignmentFormData.priority || 'Medium',
       submissionTypes: assignmentFormData.submissionTypes || ['pdf', 'link'],
+      rubric: assignmentFormData.rubric,
     };
 
     if (editingAssignmentId) {
@@ -1240,6 +1283,123 @@ export const CourseDetails = () => {
                           );
                         })}
 
+                        {/* Quizzes in this Curriculum Unit */}
+                        {(() => {
+                          const unitQuizzes = (quizzes || []).filter(
+                            (q) =>
+                              q.courseId === course.id &&
+                              (q.unitIdx !== undefined
+                                ? Number(q.unitIdx) === Number(unit.unitIdx)
+                                : 0 === Number(unit.unitIdx))
+                          );
+
+                          return unitQuizzes.map((quiz) => {
+                            const myQuizSub = (quizSubmissions || []).find(
+                              (s) => s.quizId === quiz.id && s.studentId === currentUser?.id
+                            );
+                            const quizDone = Boolean(myQuizSub);
+                            const attemptsCount = (quizSubmissions || []).filter(
+                              (s) => s.quizId === quiz.id
+                            ).length;
+
+                            return (
+                              <div
+                                key={quiz.id}
+                                onClick={() => {
+                                  if (canManageCourse) {
+                                    handleOpenEditQuizModal(quiz);
+                                  } else {
+                                    setActiveTakingQuiz(quiz);
+                                  }
+                                }}
+                                className="px-5 py-3.5 flex items-center justify-between gap-4 transition-all hover:bg-cream/40 cursor-pointer group border-t border-charcoal/5"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                                    <HelpCircle className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-xs sm:text-sm font-bold text-charcoal group-hover:text-forest transition-colors break-words leading-snug">
+                                        Multiple Choice Quiz: {quiz.title}
+                                      </h4>
+                                      <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                                        {quiz.questions?.length || 0} Questions
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-charcoal-muted mt-0.5">
+                                      Due {quiz.dueDate} • {quiz.totalPoints} pts • Limit: {quiz.duration || '20 min'} • Auto-Graded
+                                      {quizDone
+                                        ? ` • Score: ${myQuizSub.score}/${myQuizSub.maxScore}`
+                                        : ''}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="shrink-0 flex items-center gap-2">
+                                  {canManageCourse ? (
+                                    <div
+                                      className="flex items-center gap-1.5"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        Auto-Graded
+                                      </span>
+                                      <div className="flex items-center gap-1 bg-cream/70 rounded-xl p-0.5 border border-charcoal/10">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenEditQuizModal(quiz)}
+                                          title="Edit Quiz"
+                                          className="p-1 rounded-lg text-charcoal-muted hover:text-purple-700 hover:bg-white transition-colors cursor-pointer"
+                                        >
+                                          <Edit className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (confirm(`Delete quiz "${quiz.title}"?`)) {
+                                              deleteQuiz(quiz.id);
+                                            }
+                                          }}
+                                          title="Delete Quiz"
+                                          className="p-1 rounded-lg text-charcoal-muted hover:text-red-600 hover:bg-white transition-colors cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : quizDone ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveTakingQuiz(quiz);
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 text-[11px] font-bold flex items-center gap-1 hover:bg-emerald-200 cursor-pointer"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                      <span>Score: {myQuizSub.score}/{myQuizSub.maxScore}</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveTakingQuiz(quiz);
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
+                                    >
+                                      <HelpCircle className="w-3.5 h-3.5" />
+                                      <span>Take Quiz</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+
                         {/* Unit Controls for Instructor & Admin */}
                         {canManageCourse && (
                           <div className="px-5 py-3 bg-forest-50/50 border-t border-charcoal/10 flex flex-wrap items-center justify-between gap-2.5">
@@ -1263,6 +1423,14 @@ export const CourseDetails = () => {
                               >
                                 <Rocket className="w-3.5 h-3.5 text-gold-dark" />
                                 <span>+ Add Assignment</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAddQuizModal(unit.unitIdx)}
+                                className="px-3 py-1.5 rounded-xl border border-purple-300 bg-white hover:bg-purple-50 text-purple-800 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                              >
+                                <HelpCircle className="w-3.5 h-3.5 text-purple-700" />
+                                <span>+ Add Quiz</span>
                               </button>
                               <button
                                 type="button"
@@ -2587,6 +2755,113 @@ export const CourseDetails = () => {
                 />
               </div>
 
+              {/* Rubric Criteria Builder & Modifier */}
+              <div className="pt-1">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <label className="block text-xs font-bold text-charcoal uppercase tracking-wider">
+                      Evaluation Rubric &amp; Criteria Breakdown
+                    </label>
+                    <p className="text-[10px] text-charcoal-muted">
+                      Add, adjust, or remove criteria. Points update automatically.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssignmentFormData((prev) => {
+                        const updated = [
+                          ...(prev.rubric || []),
+                          { criteria: 'New Evaluation Criterion', points: 10 },
+                        ];
+                        const sum = updated.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
+                        return { ...prev, rubric: updated, maxScore: sum };
+                      });
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-forest hover:text-gold cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Criterion</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {(assignmentFormData.rubric || []).map((r, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 p-2 rounded-xl bg-cream/40 border border-charcoal/10"
+                    >
+                      <input
+                        type="text"
+                        value={r.criteria}
+                        onChange={(e) => {
+                          const updated = [...assignmentFormData.rubric];
+                          updated[idx] = { ...updated[idx], criteria: e.target.value };
+                          setAssignmentFormData({ ...assignmentFormData, rubric: updated });
+                        }}
+                        placeholder="Criterion description"
+                        className="flex-1 bg-white border border-charcoal/15 rounded-lg px-2.5 py-1.5 text-xs text-charcoal focus:outline-hidden focus:border-forest font-medium"
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        max="200"
+                        value={r.points}
+                        onChange={(e) => {
+                          const updated = [...assignmentFormData.rubric];
+                          updated[idx] = {
+                            ...updated[idx],
+                            points: Math.max(0, parseInt(e.target.value) || 0),
+                          };
+                          const sum = updated.reduce(
+                            (acc, item) => acc + (Number(item.points) || 0),
+                            0
+                          );
+                          setAssignmentFormData({
+                            ...assignmentFormData,
+                            rubric: updated,
+                            maxScore: sum,
+                          });
+                        }}
+                        className="w-16 bg-white border border-charcoal/15 rounded-lg px-2 py-1.5 text-xs text-charcoal text-center font-bold font-mono focus:outline-hidden focus:border-forest"
+                      />
+                      <span className="text-[11px] text-charcoal-muted">Pts</span>
+                      {(assignmentFormData.rubric || []).length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = assignmentFormData.rubric.filter((_, i) => i !== idx);
+                            const sum = updated.reduce(
+                              (acc, item) => acc + (Number(item.points) || 0),
+                              0
+                            );
+                            setAssignmentFormData({
+                              ...assignmentFormData,
+                              rubric: updated,
+                              maxScore: sum > 0 ? sum : assignmentFormData.maxScore,
+                            });
+                          }}
+                          className="p-1 text-charcoal-muted hover:text-red-600 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-2 text-right">
+                  <span className="text-xs font-bold text-forest font-mono">
+                    Total Rubric Points:{' '}
+                    {(assignmentFormData.rubric || []).reduce(
+                      (acc, r) => acc + (Number(r.points) || 0),
+                      0
+                    )}{' '}
+                    pts
+                  </span>
+                </div>
+              </div>
+
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-charcoal/10">
                 <button
@@ -2610,6 +2885,30 @@ export const CourseDetails = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal: Quiz Creator & Editor for Teachers */}
+      {isQuizModalOpen && (
+        <QuizModal
+          course={course}
+          editingQuiz={editingQuiz}
+          initialUnitIdx={selectedUnitIdxForQuiz}
+          onClose={() => {
+            setIsQuizModalOpen(false);
+            setEditingQuiz(null);
+          }}
+        />
+      )}
+
+      {/* Modal: Student Take Quiz & Instant Grade Review */}
+      {activeTakingQuiz && (
+        <QuizTakeModal
+          quiz={activeTakingQuiz}
+          existingSubmission={(quizSubmissions || []).find(
+            (s) => s.quizId === activeTakingQuiz.id && s.studentId === currentUser?.id
+          )}
+          onClose={() => setActiveTakingQuiz(null)}
+        />
       )}
     </div>
   );

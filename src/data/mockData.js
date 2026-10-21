@@ -526,7 +526,7 @@ export const INITIAL_SUBMISSIONS = [
     studentAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
     submissionDate: '2026-10-11 14:22',
     content: 'Here is my complete color harmony study inspired by botanical garden moss and warm sunlight.',
-    linkUrl: 'https://www.figma.com/design/cacheup-palette-study',
+    linkUrl: 'https://example.com/project-palette-study',
     fileName: 'Stella_Walton_Palette_Study.pdf',
     fileSize: '4.2 MB',
     status: 'Graded',
@@ -724,7 +724,7 @@ export const INITIAL_MATERIALS = [
     size: '1.2 MB',
     uploadDate: '2026-10-10',
     uploadedBy: 'Mika Dickens',
-    downloadUrl: 'https://github.com',
+    downloadUrl: 'https://example.com/starter-kit',
     description: 'Boilerplate repository with state machine context, accessible modals, and tokenized design system.'
   },
   {
@@ -1644,3 +1644,165 @@ export const INITIAL_MEETINGS = {
     createdAt: '2026-10-18',
   },
 };
+
+export const INITIAL_QUIZZES = [
+  {
+    id: 'quiz-1',
+    courseId: 'crs-1',
+    courseName: 'Modern Art & Contemporary Expression',
+    unitIdx: 0,
+    title: 'Color Theory & Harmonic Schemes Quiz',
+    description: 'Assess your foundational understanding of primary, secondary, and complementary color harmonies, warm vs cool balance, and optical contrast.',
+    dueDate: '2026-10-26',
+    dueTime: '11:59 PM',
+    duration: '20 minutes',
+    timeLimitMinutes: 20,
+    passingScorePercent: 70,
+    totalPoints: 40,
+    status: 'Active',
+    publishedAt: '2026-10-15',
+    questions: [
+      {
+        id: 'q-1-1',
+        prompt: 'Which color scheme utilizes three hues that are evenly spaced around the 12-hue color wheel?',
+        points: 10,
+        options: ['Analogous', 'Complementary', 'Triadic', 'Monochromatic'],
+        correctOptionIndex: 2,
+        explanation: 'A triadic color scheme forms an equilateral triangle on the color wheel (e.g. Red, Yellow, and Blue).'
+      },
+      {
+        id: 'q-1-2',
+        prompt: 'When two complementary colors are placed directly adjacent at full saturation, what visual effect is produced?',
+        points: 10,
+        options: ['Simultaneous contrast and optical vibration', 'Desaturation of both pigments', 'Monochromatic shadow blending', 'Subtractive opacity loss'],
+        correctOptionIndex: 0,
+        explanation: 'Complementary pairs create the highest possible chromatic tension and vivid contrast when juxtaposed.'
+      },
+      {
+        id: 'q-1-3',
+        prompt: 'In traditional fine art pigment mixing, what is the term for a color produced by adding white to a pure hue?',
+        points: 10,
+        options: ['Shade', 'Tone', 'Tint', 'Glaze'],
+        correctOptionIndex: 2,
+        explanation: 'A tint is made by adding white. A shade is created by adding black, and a tone is created with neutral grey.'
+      },
+      {
+        id: 'q-1-4',
+        prompt: 'In two-dimensional pictorial space, warm colors (reds, yellows, oranges) typically have what spatial tendency?',
+        points: 10,
+        options: ['Recede visually into background space', 'Advance forward toward the viewer', 'Neutralize all planar depth', 'Invert linear perspective'],
+        correctOptionIndex: 1,
+        explanation: 'Longer wavelength warm colors visually expand and advance, whereas shorter wavelength cool colors recede.'
+      }
+    ]
+  },
+  {
+    id: 'quiz-2',
+    courseId: 'crs-2',
+    courseName: 'Advanced Sketching & Anatomy',
+    unitIdx: 0,
+    title: 'Human Proportions & Volumetric Skeletal Form Quiz',
+    description: 'Test your grasp of classical 8-head proportional ratios, contrapposto balance axes, and thoracic foreshortening.',
+    dueDate: '2026-10-29',
+    dueTime: '05:00 PM',
+    duration: '15 minutes',
+    timeLimitMinutes: 15,
+    passingScorePercent: 75,
+    totalPoints: 30,
+    status: 'Active',
+    publishedAt: '2026-10-16',
+    questions: [
+      {
+        id: 'q-2-1',
+        prompt: 'In classical idealistic figure drawing, the adult human body is traditionally calibrated to how many head lengths tall?',
+        points: 10,
+        options: ['6 heads', '7.5 to 8 heads', '9.5 heads', '11 heads'],
+        correctOptionIndex: 1,
+        explanation: 'The standard classical academic canon measures an adult standing figure at approximately 7.5 to 8 heads tall.'
+      },
+      {
+        id: 'q-2-2',
+        prompt: 'What happens to the pelvis and shoulder axes during a dynamic contrapposto stance?',
+        points: 10,
+        options: ['They remain strictly parallel', 'They tilt in opposite directions (counter-opposed)', 'They lock into a rigid 90-degree square', 'They align horizontally with the floor'],
+        correctOptionIndex: 1,
+        explanation: 'Contrapposto shifts weight to one leg, causing the pelvic tilt to oppose the shoulder tilt in an organic S-curve rhythm.'
+      },
+      {
+        id: 'q-2-3',
+        prompt: 'When drawing a cylinder or limb projecting directly toward the viewer, which drafting technique is crucial to convey depth?',
+        points: 10,
+        options: ['Parallel cross-hatching without contour curvature', 'Overlapping volumetric ellipses and foreshortened contour wrapping', 'Strict flat silhouette rendering', 'Removing all cast shadows'],
+        correctOptionIndex: 1,
+        explanation: 'Curved cross-contour wrapping lines and overlapping elliptical forms communicate cylindrical compression toward the viewer.'
+      }
+    ]
+  },
+  {
+    id: 'quiz-3',
+    courseId: 'crs-3',
+    courseName: 'Arabic Calligraphy & Letterform Craft',
+    unitIdx: 0,
+    title: 'Nuqta Metric System & Qalam Geometry Quiz',
+    description: 'Verify your knowledge of proportional script measurements, pen nib slicing angles, and classical Islamic calligraphy rules.',
+    dueDate: '2026-10-31',
+    dueTime: '06:00 PM',
+    duration: '15 minutes',
+    timeLimitMinutes: 15,
+    passingScorePercent: 70,
+    totalPoints: 30,
+    status: 'Active',
+    publishedAt: '2026-10-17',
+    questions: [
+      {
+        id: 'q-3-1',
+        prompt: 'In the proportioned script system (al-Khatt al-Mansub) formalized by Ibn Muqla, what is the foundational unit of measurement?',
+        points: 10,
+        options: ['The centimeter', 'The Nuqta (rhomboid dot made by the pen nib)', 'The diameter of the inkpot', 'The length of the parchment'],
+        correctOptionIndex: 1,
+        explanation: 'The Nuqta (rhombic dot created by pressing the cut reed nib flat on parchment) is the master unit calibrating all letter heights.'
+      },
+      {
+        id: 'q-3-2',
+        prompt: 'In classical Thuluth script, the master letter Alif is conventionally calibrated to a height of how many Nuqtas?',
+        points: 10,
+        options: ['3 Nuqtas', '5 Nuqtas', '7 Nuqtas', '12 Nuqtas'],
+        correctOptionIndex: 2,
+        explanation: 'The majestic vertical stroke of the Alif in classical Thuluth is precisely 7 rhomboid Nuqta dots high.'
+      },
+      {
+        id: 'q-3-3',
+        prompt: 'What angle is standard for trimming the nib of a traditional reed pen (Qalam) for Naskh or Thuluth script?',
+        points: 10,
+        options: ['Straight 90-degree cut', 'Oblique slant between 35 to 45 degrees', '15-degree acute puncture', 'Conical ballpoint grind'],
+        correctOptionIndex: 1,
+        explanation: 'A 35° to 45° angled oblique bevel gives the calligrapher simultaneous control over hairline connections and broad downstrokes.'
+      }
+    ]
+  }
+];
+
+export const INITIAL_QUIZ_SUBMISSIONS = [
+  {
+    id: 'qsub-1',
+    quizId: 'quiz-1',
+    quizTitle: 'Color Theory & Harmonic Schemes Quiz',
+    courseId: 'crs-1',
+    courseName: 'Modern Art & Contemporary Expression',
+    studentId: 'usr-1',
+    studentName: 'Stella Walton',
+    studentAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+    submittedAt: '2026-10-18 16:30',
+    answers: {
+      'q-1-1': 2,
+      'q-1-2': 0,
+      'q-1-3': 2,
+      'q-1-4': 1
+    },
+    score: 40,
+    maxScore: 40,
+    percentage: 100,
+    passed: true,
+    timeSpent: '8 min 42 sec'
+  }
+];
