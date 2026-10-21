@@ -524,12 +524,12 @@ export const LMSProvider = ({ children }) => {
     addToast('User removed from system.', 'info');
   };
 
-  const updateProfile = (updatedFields) => {
+  const updateProfile = (updatedFields, message = 'Profile updated successfully!') => {
     if (!currentUser) return;
     const updated = { ...currentUser, ...updatedFields };
     setCurrentUser(updated);
     setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
-    addToast('Profile updated successfully!', 'success');
+    addToast(message, 'success');
   };
 
   // Course actions
