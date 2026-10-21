@@ -18,6 +18,7 @@ import {
   INITIAL_QUIZ_SUBMISSIONS,
 } from '../data/mockData';
 import { getDefaultUnitLessons } from '../data/courseCurriculum';
+import { api } from '../services/api';
 
 const LMSContext = createContext(null);
 
@@ -418,6 +419,74 @@ export const LMSProvider = ({ children }) => {
     localStorage.setItem('cacheup_custom_lessons', JSON.stringify(customLessons));
   }, [customLessons]);
 
+  // Synchronize state with backend database on startup
+  useEffect(() => {
+    let isMounted = true;
+    const syncDatabase = async () => {
+      try {
+        const isHealthy = await api.checkHealth();
+        if (!isHealthy || !isMounted) return;
+
+        const [
+          resUsers,
+          resCourses,
+          resAssignments,
+          resSubmissions,
+          resQuizzes,
+          resQuizSubs,
+          resMaterials,
+          resAnnouncements,
+          resSchedules,
+        ] = await Promise.allSettled([
+          api.users.getAll(),
+          api.courses.getAll(),
+          api.assignments.getAll(),
+          api.submissions.getAll(),
+          api.quizzes.getAll(),
+          api.quizzes.getSubmissions(),
+          api.materials.getAll(),
+          api.announcements.getAll(),
+          api.schedules.getAll(),
+        ]);
+
+        if (isMounted) {
+          if (resUsers.status === 'fulfilled' && Array.isArray(resUsers.value) && resUsers.value.length > 0) {
+            setUsers(resUsers.value);
+          }
+          if (resCourses.status === 'fulfilled' && Array.isArray(resCourses.value) && resCourses.value.length > 0) {
+            setCourses(resCourses.value);
+          }
+          if (resAssignments.status === 'fulfilled' && Array.isArray(resAssignments.value)) {
+            setAssignments(resAssignments.value);
+          }
+          if (resSubmissions.status === 'fulfilled' && Array.isArray(resSubmissions.value)) {
+            setSubmissions(resSubmissions.value);
+          }
+          if (resQuizzes.status === 'fulfilled' && Array.isArray(resQuizzes.value)) {
+            setQuizzes(resQuizzes.value);
+          }
+          if (resQuizSubs.status === 'fulfilled' && Array.isArray(resQuizSubs.value)) {
+            setQuizSubmissions(resQuizSubs.value);
+          }
+          if (resMaterials.status === 'fulfilled' && Array.isArray(resMaterials.value)) {
+            setMaterials(resMaterials.value);
+          }
+          if (resAnnouncements.status === 'fulfilled' && Array.isArray(resAnnouncements.value)) {
+            setAnnouncements(resAnnouncements.value);
+          }
+          if (resSchedules.status === 'fulfilled' && typeof resSchedules.value === 'object' && resSchedules.value !== null) {
+            setUserSchedules(resSchedules.value);
+          }
+        }
+      } catch (err) {
+        console.warn('Backend sync failed, using cached/mock local state:', err);
+      }
+    };
+
+    syncDatabase();
+    return () => { isMounted = false; };
+  }, []);
+
   // Toast Notification helper
   const addToast = (message, type = 'success') => {
     const id = Date.now().toString();
@@ -601,12 +670,14 @@ export const LMSProvider = ({ children }) => {
         { unit: 'Unit 3', title: 'Capstone Project & Final Assessment', lessons: 6 }
       ]
     };
+    api.courses.create(newCourse).catch((e) => console.warn(e));
     setCourses((prev) => [newCourse, ...prev]);
     addToast(`Course "${newCourse.title}" created successfully!`, 'success');
     return newCourse;
   };
 
   const updateCourse = (courseId, courseData) => {
+    api.courses.update(courseId, courseData).catch((e) => console.warn(e));
     setCourses((prev) =>
       prev.map((c) => (c.id === courseId ? { ...c, ...courseData } : c))
     );
@@ -614,6 +685,7 @@ export const LMSProvider = ({ children }) => {
   };
 
   const deleteCourse = (courseId) => {
+    api.courses.delete(courseId).catch((e) => console.warn(e));
     setCourses((prev) => prev.filter((c) => c.id !== courseId));
     addToast('Course deleted.', 'info');
   };
@@ -971,6 +1043,7 @@ export const LMSProvider = ({ children }) => {
       rubric: data.rubric || [{ criteria: 'Standard Execution & Quality', points: 100 }],
       submissionTypes: data.submissionTypes || ['pdf', 'link']
     };
+    api.assignments.create(newAsg).catch((e) => console.warn(e));
     setAssignments((prev) => [...prev, newAsg]);
     addToast(`Assignment "${newAsg.title}" published!`, 'success');
     return newAsg;
@@ -1002,6 +1075,7 @@ export const LMSProvider = ({ children }) => {
   };
 
   const deleteAssignment = (id) => {
+    api.assignments.delete(id).catch((e) => console.warn(e));
     setAssignments((prev) => prev.filter((a) => a.id !== id));
     setSubmissions((prev) => prev.filter((s) => s.assignmentId !== id));
     addToast('Assignment removed.', 'info');
@@ -1107,12 +1181,14 @@ export const LMSProvider = ({ children }) => {
       gradedAt: null
     };
 
+    api.submissions.submit(newSub).catch((e) => console.warn(e));
     setSubmissions((prev) => [newSub, ...prev]);
     addToast('Assignment submitted successfully! Great work.', 'success');
     return newSub;
   };
 
   const gradeSubmission = (subId, score, feedback, rubricScores = null) => {
+    api.submissions.grade(subId, { score, feedback, rubricScores, gradedBy: currentUser?.name || 'Instructor' }).catch((e) => console.warn(e));
     setSubmissions((prev) =>
       prev.map((s) => {
         if (s.id === subId) {
@@ -1164,6 +1240,7 @@ export const LMSProvider = ({ children }) => {
       ]
     };
 
+    api.quizzes.create(newQuiz).catch((e) => console.warn(e));
     setQuizzes((prev) => [...prev, newQuiz]);
     addToast(`Quiz "${newQuiz.title}" created successfully!`, 'success');
     return newQuiz;
@@ -1190,6 +1267,7 @@ export const LMSProvider = ({ children }) => {
   };
 
   const deleteQuiz = (id) => {
+    api.quizzes.delete(id).catch((e) => console.warn(e));
     setQuizzes((prev) => prev.filter((q) => q.id !== id));
     setQuizSubmissions((prev) => prev.filter((s) => s.quizId !== id));
     addToast('Quiz removed.', 'info');
@@ -1232,6 +1310,7 @@ export const LMSProvider = ({ children }) => {
       timeSpent: data.timeSpent || 'Completed'
     };
 
+    api.quizzes.submit(newSub).catch((e) => console.warn(e));
     setQuizSubmissions((prev) => [newSub, ...prev]);
     addToast(`Quiz submitted! Your score: ${earnedScore}/${maxScore} (${percentage}%)`, passed ? 'success' : 'info');
     return newSub;
@@ -1256,12 +1335,14 @@ export const LMSProvider = ({ children }) => {
           ? Number(data.unitIdx)
           : undefined,
     };
+    api.materials.create(newMat).catch((e) => console.warn(e));
     setMaterials((prev) => [newMat, ...prev]);
     addToast(`Material "${newMat.title}" added to course resources!`, 'success');
     return newMat;
   };
 
   const deleteMaterial = (id) => {
+    api.materials.delete(id).catch((e) => console.warn(e));
     setMaterials((prev) => prev.filter((m) => m.id !== id));
     addToast('Learning material removed.', 'info');
   };
@@ -1371,6 +1452,7 @@ export const LMSProvider = ({ children }) => {
       isRead: false,
       content: data.content
     };
+    api.announcements.create(newAnc).catch((e) => console.warn(e));
     setAnnouncements((prev) => [newAnc, ...prev]);
     addToast('Announcement broadcasted to students and staff!', 'success');
   };
@@ -1382,6 +1464,7 @@ export const LMSProvider = ({ children }) => {
   };
 
   const deleteAnnouncement = (id) => {
+    api.announcements.delete(id).catch((e) => console.warn(e));
     setAnnouncements((prev) => prev.filter((a) => a.id !== id));
     addToast('Announcement deleted.', 'info');
   };

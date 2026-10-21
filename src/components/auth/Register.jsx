@@ -61,13 +61,13 @@ export const Register = () => {
       errors[field] ? 'border-red-500 focus:ring-red-200' : 'border-charcoal/15 focus:ring-forest/30'
     }`;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const found = validate(formData);
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
-    const created = registerStudent(formData);
+    const created = await registerStudent(formData);
     if (created) setRegisteredUser(created);
   };
 
