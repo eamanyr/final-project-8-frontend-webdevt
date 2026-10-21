@@ -92,9 +92,7 @@ export const MyGrades = () => {
   const hasAnyEvaluated = (gradedSubmissions.length + studentQuizSubs.length) > 0 && totalMax > 0;
   const avgPercentage = hasAnyEvaluated ? ((totalScore / totalMax) * 100).toFixed(1) : null;
   const overallLetter = hasAnyEvaluated ? getLetterGrade(avgPercentage) : '—';
-  const displayGPA = hasAnyEvaluated
-    ? calculateGPA(avgPercentage)
-    : (currentUser?.gpa && currentUser.gpa !== 'N/A' && currentUser.gpa !== '3.88' ? currentUser.gpa : 'N/A');
+  const displayGPA = hasAnyEvaluated ? calculateGPA(avgPercentage) : 'N/A';
 
   // Enrolled Courses for this student
   const enrolledCourses = allCourses.filter((c) => {
