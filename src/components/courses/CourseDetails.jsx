@@ -1815,12 +1815,14 @@ export const CourseDetails = () => {
           assignmentRows.reduce((acc, r) => acc + r.max, 0) +
           quizRows.reduce((acc, r) => acc + r.max, 0);
 
-        const totalPercentage =
-          maxPointsEvaluated > 0
-            ? ((earnedPoints / maxPointsEvaluated) * 100).toFixed(1)
-            : '100.0';
+        const hasEvaluated = maxPointsEvaluated > 0 && (gradedAsgs.length + completedQuizzes.length) > 0;
 
-        const totalLetter = getLetter(totalPercentage);
+        const totalPercentage =
+          hasEvaluated
+            ? ((earnedPoints / maxPointsEvaluated) * 100).toFixed(1)
+            : null;
+
+        const totalLetter = hasEvaluated ? getLetter(totalPercentage) : '—';
         const completedCount = gradedAsgs.length + completedQuizzes.length;
         const totalItemsCount = assignmentRows.length + quizRows.length;
 
@@ -1871,10 +1873,12 @@ export const CourseDetails = () => {
                       Total Course Grade
                     </span>
                     <div className="text-xl font-bold text-forest font-heading">
-                      {totalPercentage}%
+                      {hasEvaluated ? `${totalPercentage}%` : 'No Grades Yet'}
                     </div>
                     <span className="text-[10px] text-emerald-700 font-semibold">
-                      {Number(totalPercentage) >= 80 ? 'In Good Academic Standing' : 'Passing Mark'}
+                      {hasEvaluated
+                        ? (Number(totalPercentage) >= 80 ? 'In Good Academic Standing' : 'Passing Mark')
+                        : 'No graded assignments or quizzes yet'}
                     </span>
                   </div>
                 </div>

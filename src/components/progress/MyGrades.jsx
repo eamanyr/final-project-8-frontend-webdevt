@@ -16,10 +16,10 @@ import {
 export const MyGrades = () => {
   const {
     currentUser,
-    submissions,
-    assignments,
-    courses,
-    quizSubmissions,
+    submissions = [],
+    assignments = [],
+    courses = [],
+    quizSubmissions = [],
     setSelectedCourseId,
     setCourseActiveTab,
     setActiveTab,
@@ -27,6 +27,7 @@ export const MyGrades = () => {
 
   // Helper for letter grades
   const getLetterGrade = (scoreOrPct, max = 100) => {
+    if (scoreOrPct === null || scoreOrPct === undefined || isNaN(scoreOrPct)) return '—';
     const pct = typeof max === 'number' && max > 0 ? (Number(scoreOrPct) / max) * 100 : Number(scoreOrPct);
     if (pct >= 94) return 'A';
     if (pct >= 90) return 'A-';
@@ -39,41 +40,79 @@ export const MyGrades = () => {
     return 'F';
   };
 
-  // Find all submissions by this student
-  const studentSubmissions = submissions.filter(
-    (s) => s.studentId === currentUser?.id
-  );
-  const gradedSubmissions = studentSubmissions.filter((s) => s.status === 'Graded');
+  const calculateGPA = (pct) => {
+    if (pct === null || pct === undefined || isNaN(pct)) return 'N/A';
+    const p = Number(pct);
+    if (p >= 94) return '4.00';
+    if (p >= 90) return '3.70';
+    if (p >= 87) return '3.30';
+    if (p >= 83) return '3.00';
+    if (p >= 80) return '2.70';
+    if (p >= 75) return '2.30';
+    if (p >= 70) return '2.00';
+    if (p >= 60) return '1.00';
+    return '0.00';
+  };
 
-  const studentQuizSubs = (quizSubmissions || []).filter(
-    (s) => s.studentId === currentUser?.id
+  if (!currentUser) {
+    return (
+      <div className="bg-white rounded-3xl p-8 border border-charcoal/10 shadow-xs text-center">
+        <GraduationCap className="w-10 h-10 text-forest mx-auto mb-2" />
+        <h3 className="text-base font-bold text-charcoal">Please log in to view your grades</h3>
+        <p className="text-xs text-charcoal-muted mt-1">
+          You must be logged into a student account to view course marks and GPA standings.
+        </p>
+      </div>
+    );
+  }
+
+  const allSubmissions = Array.isArray(submissions) ? submissions : [];
+  const allQuizSubs = Array.isArray(quizSubmissions) ? quizSubmissions : [];
+  const allCourses = Array.isArray(courses) ? courses : [];
+  const allAssignments = Array.isArray(assignments) ? assignments : [];
+
+  // Find all submissions by this student
+  const studentSubmissions = allSubmissions.filter(
+    (s) => s && (s.studentId === currentUser.id || s.studentId === currentUser._id)
+  );
+  const gradedSubmissions = studentSubmissions.filter((s) => s && s.status === 'Graded');
+
+  const studentQuizSubs = allQuizSubs.filter(
+    (s) => s && (s.studentId === currentUser.id || s.studentId === currentUser._id)
   );
 
   // Overall Cumulative Total
   const totalScore =
-    gradedSubmissions.reduce((acc, s) => acc + (s.score || 0), 0) +
-    studentQuizSubs.reduce((acc, q) => acc + (q.score || 0), 0);
+    gradedSubmissions.reduce((acc, s) => acc + (Number(s.score) || 0), 0) +
+    studentQuizSubs.reduce((acc, q) => acc + (Number(q.score) || 0), 0);
   const totalMax =
-    gradedSubmissions.reduce((acc, s) => acc + (s.maxScore || 100), 0) +
-    studentQuizSubs.reduce((acc, q) => acc + (q.maxScore || 100), 0);
-  const hasAnyEvaluated = totalMax > 0;
+    gradedSubmissions.reduce((acc, s) => acc + (Number(s.maxScore) || 100), 0) +
+    studentQuizSubs.reduce((acc, q) => acc + (Number(q.maxScore) || 100), 0);
+
+  const hasAnyEvaluated = (gradedSubmissions.length + studentQuizSubs.length) > 0 && totalMax > 0;
   const avgPercentage = hasAnyEvaluated ? ((totalScore / totalMax) * 100).toFixed(1) : null;
   const overallLetter = hasAnyEvaluated ? getLetterGrade(avgPercentage) : '—';
+  const displayGPA = hasAnyEvaluated
+    ? calculateGPA(avgPercentage)
+    : (currentUser?.gpa && currentUser.gpa !== 'N/A' && currentUser.gpa !== '3.88' ? currentUser.gpa : 'N/A');
 
   // Enrolled Courses for this student
-  const enrolledCourses = courses.filter((c) =>
-    currentUser?.enrolledCourseIds && currentUser.enrolledCourseIds.length > 0
-      ? currentUser.enrolledCourseIds.includes(c.id)
-      : true
-  );
+  const enrolledCourses = allCourses.filter((c) => {
+    if (!c) return false;
+    if (currentUser?.enrolledCourseIds && Array.isArray(currentUser.enrolledCourseIds) && currentUser.enrolledCourseIds.length > 0) {
+      return currentUser.enrolledCourseIds.includes(c.id) || currentUser.enrolledCourseIds.includes(c._id);
+    }
+    return true;
+  });
 
   // Calculate total grade per enrolled course
   const courseGradeSummaries = enrolledCourses.map((c) => {
-    const courseAsgs = assignments.filter((a) => a.courseId === c.id);
+    const courseId = c.id || c._id;
+    const courseAsgs = allAssignments.filter((a) => a && (a.courseId === courseId || a.courseId === c.id));
     const courseSubs = studentSubmissions.filter(
-      (s) => s.courseId === c.id && s.status === 'Graded'
+      (s) => s && (s.courseId === courseId || s.courseId === c.id) && s.status === 'Graded'
     );
-    const courseQuizzes = (studentQuizSubs || []).filter((q) => q.courseId === c.id);
+    const courseQuizzes = studentQuizSubs.filter((q) => q && (q.courseId === courseId || q.courseId === c.id));
 
     const asgEarned = courseSubs.reduce((acc, s) => acc + (Number(s.score) || 0), 0);
     const asgMax = courseSubs.reduce((acc, s) => acc + (Number(s.maxScore) || 100), 0);
@@ -84,7 +123,7 @@ export const MyGrades = () => {
     const totalEarned = asgEarned + quizEarned;
     const totalPossible = asgMax + quizMax;
 
-    const hasEvaluated = totalPossible > 0;
+    const hasEvaluated = (courseSubs.length + courseQuizzes.length) > 0 && totalPossible > 0;
     const percentage = hasEvaluated ? ((totalEarned / totalPossible) * 100).toFixed(1) : null;
     const letter = hasEvaluated ? getLetterGrade(percentage) : '—';
     const completedTasks = courseSubs.length + courseQuizzes.length;
@@ -102,9 +141,9 @@ export const MyGrades = () => {
   });
 
   const handleOpenCourseGrades = (courseId) => {
-    setSelectedCourseId(courseId);
+    if (setSelectedCourseId) setSelectedCourseId(courseId);
     if (setCourseActiveTab) setCourseActiveTab('grades');
-    setActiveTab('courses');
+    if (setActiveTab) setActiveTab('course-details');
   };
 
   return (
@@ -133,10 +172,12 @@ export const MyGrades = () => {
               Cumulative GPA
             </span>
             <div className="text-lg font-extrabold text-charcoal font-heading leading-tight">
-              {currentUser?.gpa ? `${currentUser.gpa}` : (hasAnyEvaluated ? '3.88' : 'N/A')} <span className="text-xs text-charcoal-muted font-normal">/ 4.0</span>
+              {displayGPA} <span className="text-xs text-charcoal-muted font-normal">/ 4.0</span>
             </div>
             <span className="text-[11px] font-semibold text-forest">
-              {hasAnyEvaluated ? `${avgPercentage}% • Letter Grade ${overallLetter}` : 'No graded tasks yet • In Progress'}
+              {hasAnyEvaluated
+                ? `${avgPercentage}% • Letter Grade ${overallLetter}`
+                : 'No graded tasks yet • In Progress'}
             </span>
           </div>
         </div>
@@ -167,65 +208,68 @@ export const MyGrades = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {courseGradeSummaries.map(({ course, totalEarned, totalPossible, percentage, letter, completedTasks }) => (
-              <div
-                key={course.id}
-                className="p-5 rounded-2xl border border-charcoal/10 bg-cream/30 hover:bg-cream/60 transition-all hover:shadow-xs flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={course.thumbnail}
-                        alt={course.title}
-                        className="w-12 h-12 rounded-xl object-cover shrink-0 border border-charcoal/10 shadow-2xs"
-                      />
-                      <div className="min-w-0">
-                        <span className="text-[10px] font-mono font-bold text-forest bg-forest/10 px-1.5 py-0.5 rounded-md">
-                          {course.code}
-                        </span>
-                        <h4 className="text-xs font-bold text-charcoal truncate mt-0.5">
-                          {course.title}
-                        </h4>
-                        <p className="text-[11px] text-charcoal-muted truncate">
-                          {course.instructorName}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Total Grade Badge */}
-                    <div className="text-right shrink-0">
-                      <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-forest text-gold font-heading text-lg font-extrabold shadow-2xs">
-                        {letter}
-                      </div>
-                      <div className="text-xs font-bold text-charcoal font-heading mt-1">
-                        {hasEvaluated ? `${percentage}%` : 'No Grades Yet'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Progress & Task Counts */}
-                  <div className="mt-4 pt-3 border-t border-charcoal/10 flex items-center justify-between text-[11px]">
-                    <span className="text-charcoal-muted">
-                      Evaluated Score: <strong className="text-charcoal font-mono">{hasEvaluated ? `${totalEarned} / ${totalPossible} pts` : '0 pts evaluated'}</strong>
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-md font-semibold text-[10px] ${completedTasks > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-charcoal/10 text-charcoal-muted'}`}>
-                      {completedTasks > 0 ? `${completedTasks} Tasks Graded` : 'Pending Evaluation'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* View Course Grades Tab Button */}
-                <button
-                  type="button"
-                  onClick={() => handleOpenCourseGrades(course.id)}
-                  className="mt-4 w-full py-2 px-3 rounded-xl bg-white border border-charcoal/15 text-xs font-bold text-forest hover:bg-forest hover:text-cream transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+            {courseGradeSummaries.map(({ course, totalEarned, totalPossible, hasEvaluated, percentage, letter, completedTasks }) => {
+              const courseId = course?.id || course?._id;
+              return (
+                <div
+                  key={courseId || Math.random()}
+                  className="p-5 rounded-2xl border border-charcoal/10 bg-cream/30 hover:bg-cream/60 transition-all hover:shadow-xs flex flex-col justify-between"
                 >
-                  <span>View Course Gradebook</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={course?.thumbnail || 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80'}
+                          alt={course?.title || 'Course'}
+                          className="w-12 h-12 rounded-xl object-cover shrink-0 border border-charcoal/10 shadow-2xs"
+                        />
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-mono font-bold text-forest bg-forest/10 px-1.5 py-0.5 rounded-md">
+                            {course?.code || 'CRS'}
+                          </span>
+                          <h4 className="text-xs font-bold text-charcoal truncate mt-0.5">
+                            {course?.title || 'Course'}
+                          </h4>
+                          <p className="text-[11px] text-charcoal-muted truncate">
+                            {course?.instructorName || 'Instructor'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Total Grade Badge */}
+                      <div className="text-right shrink-0">
+                        <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-forest text-gold font-heading text-lg font-extrabold shadow-2xs">
+                          {letter}
+                        </div>
+                        <div className="text-xs font-bold text-charcoal font-heading mt-1">
+                          {hasEvaluated ? `${percentage}%` : 'No Grades Yet'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress & Task Counts */}
+                    <div className="mt-4 pt-3 border-t border-charcoal/10 flex items-center justify-between text-[11px]">
+                      <span className="text-charcoal-muted">
+                        Evaluated Score: <strong className="text-charcoal font-mono">{hasEvaluated ? `${totalEarned} / ${totalPossible} pts` : '0 pts evaluated'}</strong>
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-md font-semibold text-[10px] ${completedTasks > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-charcoal/10 text-charcoal-muted'}`}>
+                        {completedTasks > 0 ? `${completedTasks} Tasks Graded` : 'Pending Evaluation'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* View Course Grades Tab Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCourseGrades(courseId)}
+                    className="mt-4 w-full py-2 px-3 rounded-xl bg-white border border-charcoal/15 text-xs font-bold text-forest hover:bg-forest hover:text-cream transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <span>View Course Gradebook</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -258,26 +302,27 @@ export const MyGrades = () => {
               </thead>
               <tbody className="divide-y divide-charcoal/5">
                 {studentSubmissions.map((sub) => {
-                  const isGraded = sub.status === 'Graded';
+                  const subId = sub?.id || sub?._id || Math.random();
+                  const isGraded = sub?.status === 'Graded';
                   const letter = isGraded ? getLetterGrade(sub.score, sub.maxScore) : '—';
 
                   return (
-                    <tr key={sub.id} className="hover:bg-cream/30 transition-colors">
+                    <tr key={subId} className="hover:bg-cream/30 transition-colors">
                       <td className="py-4">
                         <div className="font-bold text-charcoal">
-                          {sub.assignmentTitle}
+                          {sub?.assignmentTitle || 'Assignment'}
                         </div>
                         <div className="text-[11px] text-charcoal-muted flex items-center gap-2 mt-0.5">
-                          {sub.fileName && <span>📁 {sub.fileName}</span>}
+                          {sub?.fileName && <span>📁 {sub.fileName}</span>}
                         </div>
                       </td>
 
                       <td className="py-4 text-charcoal-muted">
-                        {sub.submissionDate}
+                        {sub?.submissionDate || '—'}
                       </td>
 
                       <td className="py-4 font-mono font-bold text-charcoal">
-                        {isGraded ? `${sub.score} / ${sub.maxScore} pts` : 'Pending'}
+                        {isGraded ? `${sub.score} / ${sub.maxScore || 100} pts` : 'Pending'}
                       </td>
 
                       <td className="py-4">
@@ -298,7 +343,7 @@ export const MyGrades = () => {
                               : 'bg-amber-100 text-amber-800'
                           }`}
                         >
-                          {sub.status}
+                          {sub?.status || 'Submitted'}
                         </span>
                       </td>
 
@@ -306,9 +351,9 @@ export const MyGrades = () => {
                         {isGraded ? (
                           <div className="text-xs text-charcoal-muted leading-relaxed">
                             <span className="font-semibold text-charcoal block text-[11px]">
-                              {sub.gradedBy || 'Instructor'}:
+                              {sub?.gradedBy || 'Instructor'}:
                             </span>
-                            "{sub.feedback}"
+                            "{sub?.feedback || 'Good work.'}"
                           </div>
                         ) : (
                           <span className="text-charcoal-muted italic">
@@ -353,21 +398,22 @@ export const MyGrades = () => {
               </thead>
               <tbody className="divide-y divide-charcoal/5">
                 {studentQuizSubs.map((qSub) => {
+                  const qSubId = qSub?.id || qSub?._id || Math.random();
                   const letter = getLetterGrade(qSub.score, qSub.maxScore);
 
                   return (
-                    <tr key={qSub.id} className="hover:bg-cream/30 transition-colors">
+                    <tr key={qSubId} className="hover:bg-cream/30 transition-colors">
                       <td className="py-4 font-bold text-charcoal">
-                        {qSub.quizTitle}
+                        {qSub?.quizTitle || 'Quiz'}
                       </td>
                       <td className="py-4 text-charcoal-muted">
-                        {qSub.courseName}
+                        {qSub?.courseName || 'Course'}
                       </td>
                       <td className="py-4 text-charcoal-muted">
-                        {qSub.submittedAt}
+                        {qSub?.submittedAt || '—'}
                       </td>
                       <td className="py-4 font-mono font-bold text-charcoal">
-                        {qSub.score} / {qSub.maxScore} pts ({qSub.percentage}%)
+                        {qSub?.score} / {qSub?.maxScore || 40} pts ({qSub?.percentage || 0}%)
                       </td>
                       <td className="py-4">
                         <span className="px-2.5 py-1 rounded-lg bg-forest/10 text-forest font-extrabold text-xs">
@@ -377,12 +423,12 @@ export const MyGrades = () => {
                       <td className="py-4">
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            qSub.passed
+                            qSub?.passed
                               ? 'bg-emerald-100 text-emerald-800'
                               : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {qSub.passed ? 'Passed' : 'Needs Review'}
+                          {qSub?.passed ? 'Passed' : 'Needs Review'}
                         </span>
                       </td>
                     </tr>
