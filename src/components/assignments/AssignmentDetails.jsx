@@ -39,7 +39,15 @@ export const AssignmentDetails = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeGradingSub, setActiveGradingSub] = useState(null);
 
-  const assignment = assignments.find((a) => a.id === selectedAssignmentId) || assignments[0];
+  const targetId = selectedAssignmentId;
+  const assignment =
+    assignments.find(
+      (a) =>
+        (a?.id && a.id === targetId) ||
+        (a?._id && a._id === targetId) ||
+        String(a?.id) === String(targetId) ||
+        String(a?._id) === String(targetId)
+    ) || assignments[0];
   if (!assignment) return null;
 
   // Edit Assignment Form State
@@ -126,12 +134,37 @@ export const AssignmentDetails = () => {
   };
 
   // Check if current user already submitted
-  const mySubmission = submissions.find(
-    (s) => s.assignmentId === assignment.id && s.studentId === currentUser?.id
-  );
+  const currentUserId = currentUser?.id || currentUser?._id;
+  const assignmentId = assignment?.id || assignment?._id;
+
+  const mySubmission = (submissions || []).find((s) => {
+    if (!s) return false;
+    const subAsgId = s.assignmentId?._id || s.assignmentId?.id || s.assignmentId;
+    const subStudentId = s.studentId?._id || s.studentId?.id || s.studentId;
+
+    const matchesAsg =
+      String(subAsgId) === String(assignmentId) ||
+      (assignment?.id && String(subAsgId) === String(assignment.id)) ||
+      (assignment?._id && String(subAsgId) === String(assignment._id));
+
+    const matchesStudent =
+      String(subStudentId) === String(currentUserId) ||
+      (currentUser?.id && String(subStudentId) === String(currentUser.id)) ||
+      (currentUser?._id && String(subStudentId) === String(currentUser._id));
+
+    return matchesAsg && matchesStudent;
+  });
 
   // Submissions for this assignment (for teacher view)
-  const assignmentSubmissions = submissions.filter((s) => s.assignmentId === assignment.id);
+  const assignmentSubmissions = (submissions || []).filter((s) => {
+    if (!s) return false;
+    const subAsgId = s.assignmentId?._id || s.assignmentId?.id || s.assignmentId;
+    return (
+      String(subAsgId) === String(assignmentId) ||
+      (assignment?.id && String(subAsgId) === String(assignment.id)) ||
+      (assignment?._id && String(subAsgId) === String(assignment._id))
+    );
+  });
 
   const isTeacherOrAdmin = currentUser?.role === 'teacher' || currentUser?.role === 'admin';
   const backTarget = assignmentOrigin === 'course-details' ? 'course-details' : 'todo';
@@ -326,6 +359,103 @@ export const AssignmentDetails = () => {
           </div>
         </div>
       </div>
+
+      {/* Student View: My Submitted Deliverable Card */}
+      {currentUser?.role === 'student' && mySubmission && (
+        <div className="bg-white rounded-3xl p-6 sm:p-7 border border-charcoal/10 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-charcoal/10">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-forest px-2.5 py-0.5 rounded-full bg-forest/10 inline-block mb-1">
+                Your Submitted Deliverable
+              </span>
+              <h3 className="text-base font-bold font-heading text-charcoal">
+                Submission Records & Faculty Feedback
+              </h3>
+            </div>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider self-start sm:self-auto ${
+                mySubmission.status === 'Graded'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {mySubmission.status === 'Graded' ? 'Graded & Evaluated' : 'Submitted (Awaiting Grade)'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div className="p-4 rounded-2xl bg-cream/30 border border-charcoal/10 space-y-1.5">
+              <span className="text-[10px] font-bold uppercase text-charcoal-muted tracking-wider block">
+                Submission Details
+              </span>
+              <p className="font-semibold text-charcoal">
+                Submitted on: <span className="font-normal text-charcoal-muted">{mySubmission.submissionDate}</span>
+              </p>
+              {mySubmission.fileName && (
+                <p className="font-semibold text-charcoal">
+                  File Deliverable: <span className="font-mono text-forest font-bold">📁 {mySubmission.fileName}</span> {mySubmission.fileSize && <span className="text-charcoal-muted font-normal">({mySubmission.fileSize})</span>}
+                </p>
+              )}
+              {mySubmission.linkUrl && (
+                <p className="font-semibold text-charcoal">
+                  Project URL:{' '}
+                  <a
+                    href={mySubmission.linkUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-forest underline hover:text-forest-dark font-medium inline-flex items-center gap-1"
+                  >
+                    <span>{mySubmission.linkUrl}</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </p>
+              )}
+              {mySubmission.content && (
+                <div className="pt-1.5 border-t border-charcoal/10 mt-2">
+                  <span className="text-[10px] font-bold uppercase text-charcoal-muted block mb-0.5">Student Notes</span>
+                  <p className="text-charcoal-muted italic line-clamp-3">"{mySubmission.content}"</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 rounded-2xl bg-cream/30 border border-charcoal/10 space-y-1.5">
+              <span className="text-[10px] font-bold uppercase text-charcoal-muted tracking-wider block">
+                Evaluation & Critique
+              </span>
+              {mySubmission.status === 'Graded' ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-extrabold text-forest font-heading">
+                      {mySubmission.score} / {mySubmission.maxScore} pts
+                    </span>
+                    <span className="text-xs font-bold text-charcoal font-mono">
+                      ({Math.round(((mySubmission.score || 0) / (mySubmission.maxScore || 100)) * 100)}%)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-charcoal font-medium">
+                    Evaluated by: <strong className="text-forest">{mySubmission.gradedBy || 'Course Faculty'}</strong>
+                  </p>
+                  {mySubmission.feedback ? (
+                    <div className="pt-1.5 border-t border-charcoal/10 mt-1">
+                      <span className="text-[10px] font-bold uppercase text-charcoal-muted block mb-0.5">Faculty Critique</span>
+                      <p className="text-charcoal italic">"{mySubmission.feedback}"</p>
+                    </div>
+                  ) : (
+                    <p className="text-charcoal-muted text-[11px]">No written commentary attached.</p>
+                  )}
+                </>
+              ) : (
+                <div className="py-3 text-center sm:text-left space-y-1">
+                  <p className="font-semibold text-charcoal">Pending Faculty Review</p>
+                  <p className="text-charcoal-muted text-[11px] leading-relaxed">
+                    Your deliverable is in the queue. You will receive an assessment notification once your instructor reviews this assignment.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Teacher View: Student Submissions for this specific assignment */}
       {isTeacherOrAdmin && (

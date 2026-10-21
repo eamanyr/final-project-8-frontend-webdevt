@@ -1647,11 +1647,22 @@ export const CourseDetails = () => {
                     ? course.syllabus?.[asg.unitIdx]?.unit || `Unit ${asg.unitIdx + 1}`
                     : null;
 
+                const asgId = asg?.id || asg?._id;
+                const currentUserId = currentUser?.id || currentUser?._id;
+                const mySub = isStudent ? (submissions || []).find((s) => {
+                  const subAsgId = s?.assignmentId?._id || s?.assignmentId?.id || s?.assignmentId;
+                  const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+                  return (
+                    (String(subAsgId) === String(asgId) || String(subAsgId) === String(asg?.id) || String(subAsgId) === String(asg?._id)) &&
+                    (String(subStudentId) === String(currentUserId))
+                  );
+                }) : null;
+
                 return (
                   <div
-                    key={asg.id}
+                    key={asg.id || asg._id}
                     onClick={() => {
-                      setSelectedAssignmentId(asg.id);
+                      setSelectedAssignmentId(asg.id || asg._id);
                       setActiveTab('assignment-details');
                     }}
                     className="p-4 rounded-2xl border border-charcoal/10 bg-cream/40 hover:border-forest/30 hover:shadow-xs transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -1669,6 +1680,23 @@ export const CourseDetails = () => {
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold/20 text-gold-dark">
                           {asg.priority} Priority
                         </span>
+                        {isStudent && (
+                          mySub ? (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 ${
+                              mySub.status === 'Graded'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-emerald-50 text-emerald-700'
+                            }`}>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>{mySub.status === 'Graded' ? `Graded: ${mySub.score}/${asg.maxScore}` : 'Submitted'}</span>
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              <span>Awaiting Submission</span>
+                            </span>
+                          )
+                        )}
                       </div>
                       <p className="text-xs text-charcoal-muted mt-1 max-w-xl">
                         {asg.description}
@@ -1711,7 +1739,7 @@ export const CourseDetails = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedAssignmentId(asg.id);
+                          setSelectedAssignmentId(asg.id || asg._id);
                           setActiveTab('assignment-details');
                         }}
                         className="px-4 py-2 rounded-xl bg-charcoal text-cream text-xs font-bold hover:bg-charcoal-light transition-colors"
