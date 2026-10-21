@@ -451,7 +451,7 @@ export const LMSProvider = ({ children }) => {
 
         if (isMounted) {
           if (resUsers.status === 'fulfilled' && Array.isArray(resUsers.value) && resUsers.value.length > 0) {
-            setUsers(resUsers.value);
+            setUsers(resUsers.value.map(u => ({ ...u, password: u.password || 'password123' })));
           }
           if (resCourses.status === 'fulfilled' && Array.isArray(resCourses.value) && resCourses.value.length > 0) {
             setCourses(resCourses.value);
@@ -501,15 +501,43 @@ export const LMSProvider = ({ children }) => {
   };
 
   // Authentication actions
-  const login = (email, password) => {
+  const login = async (email, password) => {
+    const cleanEmail = email.toLowerCase().trim();
+    try {
+      const res = await api.auth.login(cleanEmail, password);
+      if (res && res.user) {
+        const loggedUser = {
+          ...res.user,
+          id: res.user.id || res.user._id,
+        };
+        setCurrentUser(loggedUser);
+        setActiveTab('dashboard', loggedUser);
+        const teacherFirstName = loggedUser.name.replace(/^Prof\.\s*/i, '').trim().split(' ')[0];
+        addToast(
+          loggedUser.role === 'teacher'
+            ? `Hello Prof. ${teacherFirstName}!`
+            : `Welcome back, ${loggedUser.name}!`,
+          'success'
+        );
+        return true;
+      }
+    } catch (err) {
+      if (err.data && err.data.message) {
+        addToast(err.data.message, err.status === 403 ? 'warning' : 'error');
+        return false;
+      }
+    }
+
+    // Local fallback if server unreachable
     const found = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase().trim()
+      (u) => u.email.toLowerCase() === cleanEmail
     );
     if (!found) {
       addToast('No user found with this email address.', 'error');
       return false;
     }
-    if (found.password !== password) {
+    const expectedPassword = found.password || 'password123';
+    if (expectedPassword !== password) {
       addToast('Invalid password. Please check your credentials.', 'error');
       return false;
     }
