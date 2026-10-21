@@ -122,8 +122,7 @@ export const Register = () => {
               </p>
               <button
                 onClick={() => {
-                  switchDemoUser('admin');
-                  setActiveTab('approvals');
+                  switchDemoUser('admin', 'approvals');
                 }}
                 className="mt-3 w-full py-2 px-3 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all text-center"
               >

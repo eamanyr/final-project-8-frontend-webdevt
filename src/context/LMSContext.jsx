@@ -569,7 +569,7 @@ export const LMSProvider = ({ children }) => {
   };
 
   // Switch demo persona instantly
-  const switchDemoUser = (role) => {
+  const switchDemoUser = (role, targetTab = "dashboard") => {
     let target;
     if (role === 'student') {
       target = users.find((u) => u.id === 'usr-1') || users.find((u) => u.role === 'student' && u.status === 'approved');
@@ -580,7 +580,7 @@ export const LMSProvider = ({ children }) => {
     }
     if (target) {
       setCurrentUser(target);
-      setActiveTab('dashboard', target);
+      setActiveTab(targetTab, target);
       addToast(`Switched active persona to ${target.name} (${target.role.toUpperCase()})`, 'info');
     }
   };
@@ -594,13 +594,44 @@ export const LMSProvider = ({ children }) => {
     }
   };
 
-  // Student Registration
-  const registerStudent = (formData) => {
+  // Student Registration (synchronized with backend database)
+  const registerStudent = async (formData) => {
     const email = formData.email.trim().toLowerCase();
     if (users.some((u) => u.email.toLowerCase() === email)) {
       addToast('An account with this email already exists.', 'error');
       return null;
     }
+
+    try {
+      const res = await api.auth.register({
+        name: formData.name.trim(),
+        email,
+        password: formData.password,
+        department: formData.department,
+        phone: formData.phone,
+        bio: formData.bio,
+        notes: formData.notes,
+      });
+
+      if (res && res.user) {
+        const newUser = {
+          ...res.user,
+          id: res.user.id || res.user._id,
+          password: formData.password || 'password123',
+        };
+        setUsers((prev) => [newUser, ...prev.filter((u) => u.id !== newUser.id && u.email !== newUser.email)]);
+        addToast('Registration submitted! An administrator will review and approve your account.', 'success');
+        return newUser;
+      }
+    } catch (err) {
+      console.warn('Backend register error:', err);
+      if (err.data && err.data.message) {
+        addToast(err.data.message, 'error');
+        return null;
+      }
+    }
+
+    // Local fallback if backend is unreachable
     const newUser = {
       id: `usr-${Date.now()}`,
       name: formData.name.trim(),
@@ -628,45 +659,59 @@ export const LMSProvider = ({ children }) => {
     return newUser;
   };
 
-  // Admin user approvals
+  // Admin user approvals (persisted to backend database)
   const approveUser = (userId) => {
+    api.users.updateStatus(userId, 'approved').catch((e) => console.warn(e));
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, status: 'approved', title: 'Enrolled Student' } : u))
+      prev.map((u) =>
+        u.id === userId || u._id === userId
+          ? { ...u, status: 'approved', title: 'Enrolled Student' }
+          : u
+      )
     );
     addToast('Student registration approved! Student can now log in.', 'success');
   };
 
   const rejectUser = (userId, reason) => {
+    api.users.updateStatus(userId, 'rejected').catch((e) => console.warn(e));
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, status: 'rejected', rejectionReason: reason || 'Application criteria incomplete' } : u))
+      prev.map((u) =>
+        u.id === userId || u._id === userId
+          ? { ...u, status: 'rejected', rejectionReason: reason || 'Application criteria incomplete' }
+          : u
+      )
     );
     addToast('Student registration rejected.', 'warning');
   };
 
   const updateUserRole = (userId, newRole) => {
+    api.users.updateProfile(userId, { role: newRole }).catch((e) => console.warn(e));
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
+      prev.map((u) => (u.id === userId || u._id === userId ? { ...u, role: newRole } : u))
     );
-    if (currentUser?.id === userId) {
+    if (currentUser?.id === userId || currentUser?._id === userId) {
       setCurrentUser((prev) => ({ ...prev, role: newRole }));
     }
-    addToast('User role updated successfully.', 'success');
+    addToast(`User role updated to ${newRole}.`, 'success');
   };
 
   const deleteUser = (userId) => {
-    if (currentUser?.id === userId) {
+    if (currentUser?.id === userId || currentUser?._id === userId) {
       addToast('Cannot delete the currently logged in user!', 'error');
       return;
     }
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    api.users.delete(userId).catch((e) => console.warn(e));
+    setUsers((prev) => prev.filter((u) => u.id !== userId && u._id !== userId));
     addToast('User removed from system.', 'info');
   };
 
   const updateProfile = (updatedFields, message = 'Profile updated successfully!') => {
     if (!currentUser) return;
+    const currentId = currentUser.id || currentUser._id;
+    api.users.updateProfile(currentId, updatedFields).catch((e) => console.warn(e));
     const updated = { ...currentUser, ...updatedFields };
     setCurrentUser(updated);
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
+    setUsers((prev) => prev.map((u) => (u.id === currentId || u._id === currentId ? updated : u)));
     addToast(message, 'success');
   };
 
