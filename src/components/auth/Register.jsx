@@ -1,6 +1,38 @@
 import React, { useState } from 'react';
 import { useLMS } from '../../context/LMSContext';
-import { Sparkles, ArrowLeft, CheckCircle2, UserPlus, Clock } from 'lucide-react';
+import { Sparkles, ArrowLeft, UserPlus, Clock } from 'lucide-react';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_REGEX = /^\+?\d{10,13}$/;
+
+const validate = (data) => {
+  const errors = {};
+
+  const name = data.name.trim();
+  if (!name) errors.name = 'Full name is required.';
+  else if (name.length < 2 || name.length > 50) errors.name = 'Name must be 2 to 50 characters.';
+
+  const email = data.email.trim();
+  if (!email) errors.email = 'Email is required.';
+  else if (!EMAIL_REGEX.test(email)) errors.email = 'Enter a valid email like name@example.com.';
+
+  if (!data.password) errors.password = 'Password is required.';
+  else if (data.password.length < 8) errors.password = 'Use at least 8 characters.';
+
+  if (!data.confirmPassword) errors.confirmPassword = 'Please confirm your password.';
+  else if (data.password !== data.confirmPassword) errors.confirmPassword = 'Passwords do not match.';
+
+  // Phone is optional, but if filled in it must look like a real number.
+  const phone = data.phone.replace(/[\s\-().]/g, '');
+  if (phone && !PHONE_REGEX.test(phone)) {
+    errors.phone = 'Enter a valid number, e.g. 0917 123 4567 or +63 917 123 4567.';
+  }
+
+  return errors;
+};
+
+const FieldError = ({ message }) =>
+  message ? <p className="mt-1 text-[11px] text-red-600">{message}</p> : null;
 
 export const Register = () => {
   const { registerStudent, setActiveTab, switchDemoUser } = useLMS();
@@ -16,16 +48,27 @@ export const Register = () => {
     notes: '',
   });
 
+  const [errors, setErrors] = useState({});
   const [registeredUser, setRegisteredUser] = useState(null);
+
+  const setField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
+  };
+
+  const inputClass = (field) =>
+    `w-full bg-cream/40 border rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 ${
+      errors[field] ? 'border-red-500 focus:ring-red-200' : 'border-charcoal/15 focus:ring-forest/30'
+    }`;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match. Please verify.');
-      return;
-    }
+    const found = validate(formData);
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
     const created = registerStudent(formData);
-    setRegisteredUser(created);
+    if (created) setRegisteredUser(created);
   };
 
   return (
@@ -99,7 +142,7 @@ export const Register = () => {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
@@ -107,12 +150,13 @@ export const Register = () => {
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. Jordan Rivers"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                  onChange={(e) => setField('name', e.target.value)}
+                  aria-invalid={!!errors.name}
+                  className={inputClass('name')}
                 />
+                <FieldError message={errors.name} />
               </div>
 
               <div>
@@ -121,12 +165,13 @@ export const Register = () => {
                 </label>
                 <input
                   type="email"
-                  required
                   placeholder="jordan@example.com"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                  onChange={(e) => setField('email', e.target.value)}
+                  aria-invalid={!!errors.email}
+                  className={inputClass('email')}
                 />
+                <FieldError message={errors.email} />
               </div>
             </div>
 
@@ -137,12 +182,13 @@ export const Register = () => {
                 </label>
                 <input
                   type="password"
-                  required
-                  placeholder="••••••••"
+                  placeholder="At least 8 characters"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                  onChange={(e) => setField('password', e.target.value)}
+                  aria-invalid={!!errors.password}
+                  className={inputClass('password')}
                 />
+                <FieldError message={errors.password} />
               </div>
 
               <div>
@@ -151,12 +197,13 @@ export const Register = () => {
                 </label>
                 <input
                   type="password"
-                  required
-                  placeholder="••••••••"
+                  placeholder="Repeat your password"
                   value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                  onChange={(e) => setField('confirmPassword', e.target.value)}
+                  aria-invalid={!!errors.confirmPassword}
+                  className={inputClass('confirmPassword')}
                 />
+                <FieldError message={errors.confirmPassword} />
               </div>
             </div>
 
@@ -167,7 +214,7 @@ export const Register = () => {
                 </label>
                 <select
                   value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                  onChange={(e) => setField('department', e.target.value)}
                   className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
                 >
                   <option value="School of Design & Creative Arts">School of Design & Creative Arts</option>
@@ -183,11 +230,15 @@ export const Register = () => {
                 </label>
                 <input
                   type="tel"
-                  placeholder="+1 (555) 000-0000"
+                  inputMode="tel"
+                  maxLength={20}
+                  placeholder="e.g. 0917 123 4567"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                  onChange={(e) => setField('phone', e.target.value)}
+                  aria-invalid={!!errors.phone}
+                  className={inputClass('phone')}
                 />
+                <FieldError message={errors.phone} />
               </div>
             </div>
 
@@ -199,7 +250,7 @@ export const Register = () => {
                 rows={2}
                 placeholder="Briefly describe your creative background and goals..."
                 value={formData.bio}
-                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                onChange={(e) => setField('bio', e.target.value)}
                 className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 resize-none"
               />
             </div>

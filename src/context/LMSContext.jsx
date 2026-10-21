@@ -197,14 +197,14 @@ export const LMSProvider = ({ children }) => {
   const isAdmin = currentUser?.role === 'admin';
   const currentUserSchedule = isAdmin
     ? {
-        title: `${currentUser?.name || 'Administrator'} — Academic Administration (No Class Schedules)`,
-        items: [],
-      }
+      title: `${currentUser?.name || 'Administrator'} — Academic Administration (No Class Schedules)`,
+      items: [],
+    }
     : userSchedules[currentUserId] ||
-      INITIAL_USER_SCHEDULES[currentUserId] || {
-        title: `${currentUser?.name || 'Student'} — Weekly Studio Schedule`,
-        items: [],
-      };
+    INITIAL_USER_SCHEDULES[currentUserId] || {
+      title: `${currentUser?.name || 'Student'} — Weekly Studio Schedule`,
+      items: [],
+    };
 
   const schedule = isAdmin ? [] : (currentUserSchedule.items || []);
   const scheduleTitle =
@@ -458,10 +458,15 @@ export const LMSProvider = ({ children }) => {
 
   // Student Registration
   const registerStudent = (formData) => {
+    const email = formData.email.trim().toLowerCase();
+    if (users.some((u) => u.email.toLowerCase() === email)) {
+      addToast('An account with this email already exists.', 'error');
+      return null;
+    }
     const newUser = {
       id: `usr-${Date.now()}`,
-      name: formData.name,
-      email: formData.email,
+      name: formData.name.trim(),
+      email,
       password: formData.password || 'password123',
       role: 'student',
       status: 'pending', // Awaiting Admin Approval
@@ -607,25 +612,25 @@ export const LMSProvider = ({ children }) => {
         Array.isArray(lessonData.majorFunctions) && lessonData.majorFunctions.length
           ? lessonData.majorFunctions
           : [
-              'Analyze foundational principles and contemporary design theory.',
-              'Apply techniques through structured hands-on studio iterations.',
-              'Engage in peer critique and document comprehensive design rationale.',
-            ],
+            'Analyze foundational principles and contemporary design theory.',
+            'Apply techniques through structured hands-on studio iterations.',
+            'Engage in peer critique and document comprehensive design rationale.',
+          ],
       partsTitle:
         lessonData.partsTitle || 'Core Components & Technical Terminology',
       parts:
         Array.isArray(lessonData.parts) && lessonData.parts.length
           ? lessonData.parts
           : [
-              {
-                term: 'Theoretical Foundation',
-                desc: 'Primary conceptual principle and studio background methodology.',
-              },
-              {
-                term: 'Practical Studio Execution',
-                desc: 'Step-by-step production method and portfolio deliverable.',
-              },
-            ],
+            {
+              term: 'Theoretical Foundation',
+              desc: 'Primary conceptual principle and studio background methodology.',
+            },
+            {
+              term: 'Practical Studio Execution',
+              desc: 'Step-by-step production method and portfolio deliverable.',
+            },
+          ],
       diagram: lessonData.diagram || {
         top: 'Visual Brief & Initial Concept',
         middle1: 'Iterative Exploration & Rapid Prototyping',
@@ -948,8 +953,8 @@ export const LMSProvider = ({ children }) => {
             (data.priority || a.priority) === 'High'
               ? 'gold'
               : (data.priority || a.priority) === 'Low'
-              ? 'sage'
-              : 'forest',
+                ? 'sage'
+                : 'forest',
         };
       })
     );
@@ -1322,12 +1327,12 @@ export const LMSProvider = ({ children }) => {
           items: currentItems.map((item) =>
             item.id === id
               ? {
-                  ...item,
-                  ...data,
-                  days,
-                  day: days.join(', '),
-                  time: data.time || `${data.startTime || item.startTime} - ${data.endTime || item.endTime}`,
-                }
+                ...item,
+                ...data,
+                days,
+                day: days.join(', '),
+                time: data.time || `${data.startTime || item.startTime} - ${data.endTime || item.endTime}`,
+              }
               : item
           ),
         },
@@ -1479,10 +1484,10 @@ export const LMSProvider = ({ children }) => {
   const pendingApprovalsCount = users.filter((u) => u.status === 'pending').length;
   const teacherCourseIds = currentUser?.role === 'teacher'
     ? new Set(
-        courses
-          .filter((c) => c.instructorId === currentUser.id || currentUser.assignedCourseIds?.includes(c.id))
-          .map((c) => c.id)
-      )
+      courses
+        .filter((c) => c.instructorId === currentUser.id || currentUser.assignedCourseIds?.includes(c.id))
+        .map((c) => c.id)
+    )
     : null;
   const pendingGradingCount = teacherCourseIds
     ? submissions.filter((s) => s.status === 'Submitted' && teacherCourseIds.has(s.courseId)).length
