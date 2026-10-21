@@ -56,8 +56,9 @@ export const MyGrades = () => {
   const totalMax =
     gradedSubmissions.reduce((acc, s) => acc + (s.maxScore || 100), 0) +
     studentQuizSubs.reduce((acc, q) => acc + (q.maxScore || 100), 0);
-  const avgPercentage = totalMax > 0 ? ((totalScore / totalMax) * 100).toFixed(1) : '94.5';
-  const overallLetter = getLetterGrade(avgPercentage);
+  const hasAnyEvaluated = totalMax > 0;
+  const avgPercentage = hasAnyEvaluated ? ((totalScore / totalMax) * 100).toFixed(1) : null;
+  const overallLetter = hasAnyEvaluated ? getLetterGrade(avgPercentage) : '—';
 
   // Enrolled Courses for this student
   const enrolledCourses = courses.filter((c) =>
@@ -83,14 +84,16 @@ export const MyGrades = () => {
     const totalEarned = asgEarned + quizEarned;
     const totalPossible = asgMax + quizMax;
 
-    const percentage = totalPossible > 0 ? ((totalEarned / totalPossible) * 100).toFixed(1) : '95.0';
-    const letter = getLetterGrade(percentage);
+    const hasEvaluated = totalPossible > 0;
+    const percentage = hasEvaluated ? ((totalEarned / totalPossible) * 100).toFixed(1) : null;
+    const letter = hasEvaluated ? getLetterGrade(percentage) : '—';
     const completedTasks = courseSubs.length + courseQuizzes.length;
 
     return {
       course: c,
       totalEarned,
       totalPossible,
+      hasEvaluated,
       percentage,
       letter,
       completedTasks,
@@ -130,10 +133,10 @@ export const MyGrades = () => {
               Cumulative GPA
             </span>
             <div className="text-lg font-extrabold text-charcoal font-heading leading-tight">
-              {currentUser?.gpa || '3.88'} <span className="text-xs text-charcoal-muted font-normal">/ 4.0</span>
+              {currentUser?.gpa ? `${currentUser.gpa}` : (hasAnyEvaluated ? '3.88' : 'N/A')} <span className="text-xs text-charcoal-muted font-normal">/ 4.0</span>
             </div>
             <span className="text-[11px] font-semibold text-forest">
-              {avgPercentage}% • Letter Grade {overallLetter}
+              {hasAnyEvaluated ? `${avgPercentage}% • Letter Grade ${overallLetter}` : 'No graded tasks yet • In Progress'}
             </span>
           </div>
         </div>
@@ -196,7 +199,7 @@ export const MyGrades = () => {
                         {letter}
                       </div>
                       <div className="text-xs font-bold text-charcoal font-heading mt-1">
-                        {percentage}%
+                        {hasEvaluated ? `${percentage}%` : 'No Grades Yet'}
                       </div>
                     </div>
                   </div>
@@ -204,10 +207,10 @@ export const MyGrades = () => {
                   {/* Progress & Task Counts */}
                   <div className="mt-4 pt-3 border-t border-charcoal/10 flex items-center justify-between text-[11px]">
                     <span className="text-charcoal-muted">
-                      Evaluated Score: <strong className="text-charcoal font-mono">{totalEarned} / {totalPossible > 0 ? totalPossible : 100} pts</strong>
+                      Evaluated Score: <strong className="text-charcoal font-mono">{hasEvaluated ? `${totalEarned} / ${totalPossible} pts` : '0 pts evaluated'}</strong>
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-semibold text-[10px]">
-                      {completedTasks} Tasks Graded
+                    <span className={`px-2 py-0.5 rounded-md font-semibold text-[10px] ${completedTasks > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-charcoal/10 text-charcoal-muted'}`}>
+                      {completedTasks > 0 ? `${completedTasks} Tasks Graded` : 'Pending Evaluation'}
                     </span>
                   </div>
                 </div>
