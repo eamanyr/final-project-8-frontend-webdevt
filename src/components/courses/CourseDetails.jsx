@@ -3,6 +3,7 @@ import { useLMS } from '../../context/LMSContext';
 import { buildCourseUnitsWithItems } from '../../data/courseCurriculum';
 import {
   ArrowLeft,
+  Award,
   GripVertical,
   Users,
   FileText,
@@ -79,9 +80,23 @@ export const CourseDetails = () => {
     courseMeetings,
     saveCourseMeeting,
     removeCourseMeeting,
+    courseActiveTab,
+    setCourseActiveTab,
   } = useLMS();
 
-  const [activeTab, setActiveSection] = useState('syllabus');
+  const [activeTab, setActiveSection] = useState(courseActiveTab || 'syllabus');
+  const [selectedGradeStudentId, setSelectedGradeStudentId] = useState('');
+
+  React.useEffect(() => {
+    if (courseActiveTab) {
+      setActiveSection(courseActiveTab);
+    }
+  }, [courseActiveTab]);
+
+  const handleTabChange = (tab) => {
+    setActiveSection(tab);
+    if (setCourseActiveTab) setCourseActiveTab(tab);
+  };
   const [openUnits, setOpenUnits] = useState({ 0: true, 1: true, 2: true });
   const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -788,7 +803,7 @@ export const CourseDetails = () => {
       {/* Internal Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-charcoal/10 pb-2 overflow-x-auto">
         <button
-          onClick={() => setActiveSection('syllabus')}
+          onClick={() => handleTabChange('syllabus')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'syllabus'
               ? 'bg-forest text-cream shadow-xs'
@@ -798,7 +813,7 @@ export const CourseDetails = () => {
           Syllabus & Units
         </button>
         <button
-          onClick={() => setActiveSection('materials')}
+          onClick={() => handleTabChange('materials')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'materials'
               ? 'bg-forest text-cream shadow-xs'
@@ -818,7 +833,7 @@ export const CourseDetails = () => {
           Assignments ({courseAssignments.length})
         </button>
         <button
-          onClick={() => setActiveSection('meet')}
+          onClick={() => handleTabChange('meet')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2 ${
             activeTab === 'meet'
               ? 'bg-forest text-cream shadow-xs'
@@ -832,7 +847,7 @@ export const CourseDetails = () => {
           )}
         </button>
         <button
-          onClick={() => setActiveSection('students')}
+          onClick={() => handleTabChange('students')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'students'
               ? 'bg-forest text-cream shadow-xs'
@@ -1701,7 +1716,386 @@ export const CourseDetails = () => {
         </div>
       )}
 
-      {/* Tab: Google Meet Live Classroom */}
+            {/* Tab: Course Grades (Scores from assignments & tasks + total grade) */}
+      {activeTab === 'grades' && (() => {
+        const effectiveStudentId = (currentUser?.role === 'teacher' || currentUser?.role === 'admin')
+          ? (selectedGradeStudentId || enrolledStudents[0]?.id || currentUser?.id)
+          : currentUser?.id;
+        const targetStudent = users.find((u) => u.id === effectiveStudentId) || currentUser;
+
+        const courseQuizzes = (quizzes || []).filter((q) => q.courseId === course.id);
+
+        const getLetter = (pct) => {
+          const n = Number(pct);
+          if (n >= 94) return 'A';
+          if (n >= 90) return 'A-';
+          if (n >= 87) return 'B+';
+          if (n >= 83) return 'B';
+          if (n >= 80) return 'B-';
+          if (n >= 75) return 'C+';
+          if (n >= 70) return 'C';
+          if (n >= 60) return 'D';
+          return 'F';
+        };
+
+        // Assignment grade rows
+        const assignmentRows = courseAssignments.map((a) => {
+          const sub = submissions.find(
+            (s) => s.assignmentId === a.id && s.studentId === effectiveStudentId
+          );
+          const isGraded = sub?.status === 'Graded';
+          const isSubmitted = sub && sub.status !== 'Pending';
+          const score = isGraded ? Number(sub.score) : 0;
+          const max = Number(a.maxScore) || 100;
+          const pct = isGraded ? Math.round((score / max) * 100) : null;
+          const letter = isGraded ? getLetter(pct) : '—';
+
+          return {
+            assignment: a,
+            submission: sub,
+            status: isGraded ? 'Graded' : isSubmitted ? 'Submitted' : 'Not Submitted',
+            isGraded,
+            score,
+            max,
+            pct,
+            letter,
+            feedback: sub?.feedback || '',
+            rubricScores: sub?.rubricScores || null,
+          };
+        });
+
+        // Quiz grade rows
+        const quizRows = courseQuizzes.map((q) => {
+          const qSub = (quizSubmissions || []).find(
+            (qs) => qs.quizId === q.id && qs.studentId === effectiveStudentId
+          );
+          const isCompleted = !!qSub;
+          const score = isCompleted ? Number(qSub.score) : 0;
+          const max = Number(q.totalPoints) || 40;
+          const pct = isCompleted ? qSub.percentage : null;
+          const letter = isCompleted ? getLetter(pct) : '—';
+
+          return {
+            quiz: q,
+            submission: qSub,
+            isCompleted,
+            score,
+            max,
+            pct,
+            letter,
+            passed: qSub ? qSub.passed : false,
+            submittedAt: qSub?.submittedAt || '',
+          };
+        });
+
+        // Compute Total Course Grade
+        const gradedAsgs = assignmentRows.filter((r) => r.isGraded);
+        const completedQuizzes = quizRows.filter((r) => r.isCompleted);
+
+        const earnedPoints =
+          gradedAsgs.reduce((acc, r) => acc + r.score, 0) +
+          completedQuizzes.reduce((acc, r) => acc + r.score, 0);
+
+        const maxPointsEvaluated =
+          gradedAsgs.reduce((acc, r) => acc + r.max, 0) +
+          completedQuizzes.reduce((acc, r) => acc + r.max, 0);
+
+        const coursePotentialMax =
+          assignmentRows.reduce((acc, r) => acc + r.max, 0) +
+          quizRows.reduce((acc, r) => acc + r.max, 0);
+
+        const totalPercentage =
+          maxPointsEvaluated > 0
+            ? ((earnedPoints / maxPointsEvaluated) * 100).toFixed(1)
+            : '100.0';
+
+        const totalLetter = getLetter(totalPercentage);
+        const completedCount = gradedAsgs.length + completedQuizzes.length;
+        const totalItemsCount = assignmentRows.length + quizRows.length;
+
+        return (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Overall Course Grade Summary Card */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-charcoal/10 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-charcoal/10">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-forest px-2.5 py-0.5 rounded-full bg-forest/10 inline-block mb-1">
+                    Course Gradebook & Cumulative Evaluation
+                  </span>
+                  <h3 className="text-xl font-bold font-heading text-charcoal">
+                    {course.code} Total Course Grade
+                  </h3>
+                  <p className="text-xs text-charcoal-muted mt-0.5">
+                    Evaluated scores for <strong className="text-charcoal">{targetStudent?.name}</strong> across all assignments, tasks, and quizzes.
+                  </p>
+                </div>
+
+                {/* Switch student dropdown for Teachers/Admins */}
+                {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && enrolledStudents.length > 0 && (
+                  <div className="flex items-center gap-2 self-start sm:self-auto bg-cream/70 p-2 rounded-2xl border border-charcoal/10">
+                    <span className="text-xs font-bold text-charcoal pl-1">Learner:</span>
+                    <select
+                      value={effectiveStudentId}
+                      onChange={(e) => setSelectedGradeStudentId(e.target.value)}
+                      className="bg-white border border-charcoal/15 text-xs font-semibold rounded-xl px-3 py-1.5 text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/20"
+                    >
+                      {enrolledStudents.map((st) => (
+                        <option key={st.id} value={st.id}>
+                          {st.name} ({st.studentId || 'ID'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* KPI Performance Highlights */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6">
+                <div className="p-4 rounded-2xl bg-forest/5 border border-forest/15 flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-forest text-gold flex items-center justify-center font-heading text-2xl font-extrabold shadow-xs shrink-0">
+                    {totalLetter}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-charcoal-muted block">
+                      Total Course Grade
+                    </span>
+                    <div className="text-xl font-bold text-forest font-heading">
+                      {totalPercentage}%
+                    </div>
+                    <span className="text-[10px] text-emerald-700 font-semibold">
+                      {Number(totalPercentage) >= 80 ? 'In Good Academic Standing' : 'Passing Mark'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-cream/60 border border-charcoal/10 flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gold/20 text-gold-dark flex items-center justify-center font-bold shrink-0">
+                    <Award className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-charcoal-muted block">
+                      Total Score / Points
+                    </span>
+                    <div className="text-xl font-bold text-charcoal font-heading font-mono">
+                      {earnedPoints} / {maxPointsEvaluated}{' '}
+                      <span className="text-xs font-normal text-charcoal-muted">pts</span>
+                    </div>
+                    <span className="text-[10px] text-charcoal-muted">
+                      Out of {coursePotentialMax} total course points
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-cream/60 border border-charcoal/10 flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+                    <CheckCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-charcoal-muted block">
+                      Completed Assessments
+                    </span>
+                    <div className="text-xl font-bold text-charcoal font-heading">
+                      {completedCount} of {totalItemsCount}{' '}
+                      <span className="text-xs font-normal text-charcoal-muted">tasks</span>
+                    </div>
+                    <span className="text-[10px] text-charcoal-muted">
+                      {assignmentRows.length} Assignments • {quizRows.length} Quizzes
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Assignments & Studio Tasks Table */}
+            <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-forest" />
+                  <h4 className="text-sm font-bold font-heading text-charcoal">
+                    Assignment & Studio Tasks
+                  </h4>
+                </div>
+                <span className="text-xs font-bold text-charcoal-muted">
+                  {assignmentRows.length} Tasks
+                </span>
+              </div>
+
+              {assignmentRows.length === 0 ? (
+                <p className="text-xs text-charcoal-muted py-6 text-center">
+                  No assignments posted for this course.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-charcoal/10 text-[10px] font-bold uppercase tracking-wider text-charcoal-muted">
+                        <th className="pb-3 font-bold">Task Name</th>
+                        <th className="pb-3 font-bold">Due Date</th>
+                        <th className="pb-3 font-bold">Status</th>
+                        <th className="pb-3 font-bold">Score</th>
+                        <th className="pb-3 font-bold">Grade</th>
+                        <th className="pb-3 font-bold">Evaluator Feedback</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-charcoal/5">
+                      {assignmentRows.map((row) => (
+                        <tr key={row.assignment.id} className="hover:bg-cream/20 transition-colors">
+                          <td className="py-3.5 pr-4">
+                            <div className="font-bold text-charcoal">{row.assignment.title}</div>
+                            <div className="text-[11px] text-charcoal-muted">
+                              {row.assignment.priority} Priority • Max {row.assignment.maxScore} pts
+                            </div>
+                          </td>
+                          <td className="py-3.5 text-charcoal-muted whitespace-nowrap">
+                            {row.assignment.dueDate}
+                          </td>
+                          <td className="py-3.5 whitespace-nowrap">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                row.status === 'Graded'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : row.status === 'Submitted'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-charcoal/10 text-charcoal-muted'
+                              }`}
+                            >
+                              {row.status}
+                            </span>
+                          </td>
+                          <td className="py-3.5 font-mono font-bold text-charcoal whitespace-nowrap">
+                            {row.isGraded ? `${row.score} / ${row.max} pts` : '—'}
+                          </td>
+                          <td className="py-3.5 whitespace-nowrap">
+                            {row.isGraded ? (
+                              <span className="px-2 py-0.5 rounded-md bg-forest/10 text-forest font-extrabold text-xs">
+                                {row.letter} ({row.pct}%)
+                              </span>
+                            ) : (
+                              <span className="text-charcoal-muted">—</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 max-w-xs text-charcoal-muted">
+                            {row.feedback ? (
+                              <div className="text-[11px] leading-snug">
+                                <span className="italic text-charcoal">"{row.feedback}"</span>
+                                {row.rubricScores && (
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    {Object.entries(row.rubricScores).map(([k, v]) => (
+                                      <span
+                                        key={k}
+                                        className="text-[9px] bg-cream px-1.5 py-0.5 rounded border border-charcoal/10"
+                                      >
+                                        {k}: {v} pts
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-charcoal-muted italic text-[11px]">
+                                {row.isGraded ? 'No feedback recorded' : 'Awaiting critique'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Quizzes & Objective Tasks Table */}
+            <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-purple-700" />
+                  <h4 className="text-sm font-bold font-heading text-charcoal">
+                    Quizzes & Knowledge Checks
+                  </h4>
+                </div>
+                <span className="text-xs font-bold text-charcoal-muted">
+                  {quizRows.length} Quizzes
+                </span>
+              </div>
+
+              {quizRows.length === 0 ? (
+                <p className="text-xs text-charcoal-muted py-6 text-center">
+                  No quizzes published for this course yet.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-charcoal/10 text-[10px] font-bold uppercase tracking-wider text-charcoal-muted">
+                        <th className="pb-3 font-bold">Quiz Assessment</th>
+                        <th className="pb-3 font-bold">Due Date</th>
+                        <th className="pb-3 font-bold">Status</th>
+                        <th className="pb-3 font-bold">Score</th>
+                        <th className="pb-3 font-bold">Grade</th>
+                        <th className="pb-3 font-bold">Outcome</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-charcoal/5">
+                      {quizRows.map((row) => (
+                        <tr key={row.quiz.id} className="hover:bg-cream/20 transition-colors">
+                          <td className="py-3.5 pr-4">
+                            <div className="font-bold text-charcoal">{row.quiz.title}</div>
+                            <div className="text-[11px] text-charcoal-muted">
+                              {row.quiz.duration} • Pass mark: {row.quiz.passingScorePercent || 70}%
+                            </div>
+                          </td>
+                          <td className="py-3.5 text-charcoal-muted whitespace-nowrap">
+                            {row.quiz.dueDate}
+                          </td>
+                          <td className="py-3.5 whitespace-nowrap">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                row.isCompleted
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-charcoal/10 text-charcoal-muted'
+                              }`}
+                            >
+                              {row.isCompleted ? 'Completed' : 'Not Attempted'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 font-mono font-bold text-charcoal whitespace-nowrap">
+                            {row.isCompleted ? `${row.score} / ${row.max} pts` : '—'}
+                          </td>
+                          <td className="py-3.5 whitespace-nowrap">
+                            {row.isCompleted ? (
+                              <span className="px-2 py-0.5 rounded-md bg-forest/10 text-forest font-extrabold text-xs">
+                                {row.letter} ({row.pct}%)
+                              </span>
+                            ) : (
+                              <span className="text-charcoal-muted">—</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 whitespace-nowrap">
+                            {row.isCompleted ? (
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                  row.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {row.passed ? 'Passed' : 'Needs Review'}
+                              </span>
+                            ) : (
+                              <span className="text-charcoal-muted italic text-[11px]">Pending attempt</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+{/* Tab: Google Meet Live Classroom */}
       {activeTab === 'meet' && (
         <div className="space-y-4">
           {/* Header Card */}

@@ -307,6 +307,7 @@ export const LMSProvider = ({ children }) => {
   const activeTab = rawTab === 'admin' || rawTab === 'teacher' ? 'dashboard' : rawTab;
 
   const [selectedCourseId, setSelectedCourseId] = useState('crs-1');
+  const [courseActiveTab, setCourseActiveTab] = useState('syllabus');
   const [selectedLessonId, setSelectedLessonId] = useState('crs-1-u1-l1');
   const [viewedLessonIds, setViewedLessonIds] = useState(() => {
     const saved = localStorage.getItem('cacheup_viewed_lessons');
