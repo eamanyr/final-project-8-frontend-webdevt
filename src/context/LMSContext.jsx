@@ -597,10 +597,6 @@ export const LMSProvider = ({ children }) => {
   // Student Registration (synchronized with backend database)
   const registerStudent = async (formData) => {
     const email = formData.email.trim().toLowerCase();
-    if (users.some((u) => u.email.toLowerCase() === email)) {
-      addToast('An account with this email already exists.', 'error');
-      return null;
-    }
 
     try {
       const res = await api.auth.register({
@@ -619,7 +615,7 @@ export const LMSProvider = ({ children }) => {
           id: res.user.id || res.user._id,
           password: formData.password || 'password123',
         };
-        setUsers((prev) => [newUser, ...prev.filter((u) => u.id !== newUser.id && u.email !== newUser.email)]);
+        setUsers((prev) => [newUser, ...prev.filter((u) => u.id !== newUser.id && u.email?.toLowerCase() !== email)]);
         addToast('Registration submitted! An administrator will review and approve your account.', 'success');
         return newUser;
       }
@@ -629,6 +625,18 @@ export const LMSProvider = ({ children }) => {
         addToast(err.data.message, 'error');
         return null;
       }
+      if (err.message && err.message.includes('fetch')) {
+        console.warn('Backend server offline, falling back to local registration.');
+      } else {
+        addToast(err.message || 'Registration failed. Please check your details.', 'error');
+        return null;
+      }
+    }
+
+    // Offline local fallback if backend is unreachable
+    if (users.some((u) => u.email.toLowerCase() === email)) {
+      addToast('An account with this email already exists.', 'error');
+      return null;
     }
 
     // Local fallback if backend is unreachable
@@ -1789,6 +1797,18 @@ export const LMSProvider = ({ children }) => {
     addToast('System reset to original fresh demo state!', 'info');
   };
 
+  // Refresh users from database
+  const refreshUsers = async () => {
+    try {
+      const data = await api.users.getAll();
+      if (Array.isArray(data) && data.length > 0) {
+        setUsers(data.map((u) => ({ ...u, password: u.password || 'password123' })));
+      }
+    } catch (err) {
+      console.warn('refreshUsers error:', err);
+    }
+  };
+
   // Helper counts
   const pendingApprovalsCount = users.filter((u) => u.status === 'pending').length;
   const teacherCourseIds = currentUser?.role === 'teacher'
@@ -1920,7 +1940,8 @@ export const LMSProvider = ({ children }) => {
         resetDemoData,
         pendingApprovalsCount,
         pendingGradingCount,
-        unreadAnnouncementsCount
+        unreadAnnouncementsCount,
+        refreshUsers
       }}
     >
       {children}

@@ -16,7 +16,11 @@ import {
 } from 'lucide-react';
 
 export const PendingApprovals = () => {
-  const { users, approveUser, rejectUser, currentUser } = useLMS();
+  const { users, approveUser, rejectUser, currentUser, refreshUsers } = useLMS();
+
+  React.useEffect(() => {
+    if (refreshUsers) refreshUsers();
+  }, []);
   const [filter, setFilter] = useState('pending');
   const [search, setSearch] = useState('');
   const [selectedApplicant, setSelectedApplicant] = useState(null);
