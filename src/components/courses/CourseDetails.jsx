@@ -833,6 +833,17 @@ export const CourseDetails = () => {
           Assignments ({courseAssignments.length})
         </button>
         <button
+          onClick={() => handleTabChange('grades')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 ${
+            activeTab === 'grades'
+              ? 'bg-forest text-cream shadow-xs'
+              : 'text-charcoal-muted hover:text-charcoal'
+          }`}
+        >
+          <Award className="w-3.5 h-3.5" />
+          <span>Grades</span>
+        </button>
+        <button
           onClick={() => handleTabChange('meet')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2 ${
             activeTab === 'meet'
