@@ -1,18 +1,14 @@
 import React, { useState } from 'react';
 import { useLMS } from '../../context/LMSContext';
-import {
-  Settings,
-  Lock,
-  User,
-  Bell,
-  Save,
-  CheckCircle2,
-  Shield,
-  Smartphone
-} from 'lucide-react';
+import { Lock, User, Bell, Save } from 'lucide-react';
+
+const PHONE_REGEX = /^\+?\d{10,13}$/;
+
+const FieldError = ({ message }) =>
+  message ? <p className="mt-1 text-[11px] text-red-600">{message}</p> : null;
 
 export const AccountSettings = () => {
-  const { currentUser, updateProfile, addToast } = useLMS();
+  const { currentUser, updateProfile } = useLMS();
 
   const [profileForm, setProfileForm] = useState({
     name: currentUser?.name || '',
@@ -22,12 +18,14 @@ export const AccountSettings = () => {
     phone: currentUser?.phone || '',
     avatar: currentUser?.avatar || '',
   });
+  const [profileErrors, setProfileErrors] = useState({});
 
   const [passForm, setPassForm] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
+  const [passErrors, setPassErrors] = useState({});
 
   const [notifications, setNotifications] = useState({
     emailGrades: true,
@@ -43,24 +41,70 @@ export const AccountSettings = () => {
     'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
   ];
 
+  const inputClass = (hasError) =>
+    `w-full bg-cream/40 border rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 ${
+      hasError ? 'border-red-500 focus:ring-red-200' : 'border-charcoal/15 focus:ring-forest/30'
+    }`;
+
+  const setProfileField = (field, value) => {
+    setProfileForm((prev) => ({ ...prev, [field]: value }));
+    if (profileErrors[field]) setProfileErrors((prev) => ({ ...prev, [field]: undefined }));
+  };
+
+  const setPassField = (field, value) => {
+    setPassForm((prev) => ({ ...prev, [field]: value }));
+    if (passErrors[field]) setPassErrors((prev) => ({ ...prev, [field]: undefined }));
+  };
+
   const handleSaveProfile = (e) => {
     e.preventDefault();
-    updateProfile(profileForm);
+    const errors = {};
+
+    const name = profileForm.name.trim();
+    if (!name) errors.name = 'Full name is required.';
+    else if (name.length < 2 || name.length > 50) errors.name = 'Name must be 2 to 50 characters.';
+
+    // Phone is optional, but if filled in it must look like a real number.
+    const phone = profileForm.phone.trim();
+    if (phone && !PHONE_REGEX.test(phone.replace(/[\s\-().]/g, ''))) {
+      errors.phone = 'Enter a valid number, e.g. 0917 123 4567 or +63 917 123 4567.';
+    }
+
+    setProfileErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    updateProfile({ ...profileForm, name, phone });
   };
 
   const handleSavePassword = (e) => {
     e.preventDefault();
-    if (passForm.newPassword !== passForm.confirmPassword) {
-      addToast('New passwords do not match.', 'error');
-      return;
+    const errors = {};
+
+    if (!passForm.currentPassword) {
+      errors.currentPassword = 'Enter your current password.';
+    } else if (passForm.currentPassword !== currentUser?.password) {
+      errors.currentPassword = 'Current password is incorrect.';
     }
-    if (passForm.newPassword.length < 6) {
-      addToast('Password must be at least 6 characters.', 'warning');
-      return;
+
+    if (!passForm.newPassword) {
+      errors.newPassword = 'Enter a new password.';
+    } else if (passForm.newPassword.length < 8) {
+      errors.newPassword = 'Use at least 8 characters.';
+    } else if (passForm.newPassword === passForm.currentPassword) {
+      errors.newPassword = 'New password must be different from the current one.';
     }
-    updateProfile({ password: passForm.newPassword });
+
+    if (!passForm.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your new password.';
+    } else if (passForm.newPassword !== passForm.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match.';
+    }
+
+    setPassErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    updateProfile({ password: passForm.newPassword }, 'Password changed successfully!');
     setPassForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    addToast('Security password successfully changed!', 'success');
   };
 
   return (
@@ -87,7 +131,7 @@ export const AccountSettings = () => {
           </h3>
         </div>
 
-        <form onSubmit={handleSaveProfile} className="space-y-5">
+        <form onSubmit={handleSaveProfile} noValidate className="space-y-5">
           {/* Avatar selector */}
           <div>
             <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-2">
@@ -99,7 +143,7 @@ export const AccountSettings = () => {
                   key={idx}
                   src={av}
                   alt=""
-                  onClick={() => setProfileForm({ ...profileForm, avatar: av })}
+                  onClick={() => setProfileField('avatar', av)}
                   className={`w-14 h-14 rounded-2xl object-cover cursor-pointer border-2 transition-all ${
                     profileForm.avatar === av
                       ? 'border-forest ring-3 ring-forest/30 scale-105'
@@ -117,11 +161,12 @@ export const AccountSettings = () => {
               </label>
               <input
                 type="text"
-                required
                 value={profileForm.name}
-                onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 font-semibold"
+                onChange={(e) => setProfileField('name', e.target.value)}
+                aria-invalid={!!profileErrors.name}
+                className={`${inputClass(profileErrors.name)} font-semibold`}
               />
+              <FieldError message={profileErrors.name} />
             </div>
 
             <div>
@@ -131,9 +176,9 @@ export const AccountSettings = () => {
               <input
                 type="text"
                 value={profileForm.title}
-                onChange={(e) => setProfileForm({ ...profileForm, title: e.target.value })}
+                onChange={(e) => setProfileField('title', e.target.value)}
                 placeholder="e.g. Visual Arts & UI Design Student"
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                className={inputClass(false)}
               />
             </div>
           </div>
@@ -146,8 +191,8 @@ export const AccountSettings = () => {
               <input
                 type="text"
                 value={profileForm.department}
-                onChange={(e) => setProfileForm({ ...profileForm, department: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                onChange={(e) => setProfileField('department', e.target.value)}
+                className={inputClass(false)}
               />
             </div>
 
@@ -157,10 +202,15 @@ export const AccountSettings = () => {
               </label>
               <input
                 type="tel"
+                inputMode="tel"
+                maxLength={20}
                 value={profileForm.phone}
-                onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                onChange={(e) => setProfileField('phone', e.target.value)}
+                placeholder="e.g. 0917 123 4567"
+                aria-invalid={!!profileErrors.phone}
+                className={inputClass(profileErrors.phone)}
               />
+              <FieldError message={profileErrors.phone} />
             </div>
           </div>
 
@@ -171,7 +221,7 @@ export const AccountSettings = () => {
             <textarea
               rows={3}
               value={profileForm.bio}
-              onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
+              onChange={(e) => setProfileField('bio', e.target.value)}
               className="w-full bg-cream/40 border border-charcoal/15 rounded-xl p-3.5 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 resize-none leading-relaxed"
             />
           </div>
@@ -197,7 +247,7 @@ export const AccountSettings = () => {
           </h3>
         </div>
 
-        <form onSubmit={handleSavePassword} className="space-y-4">
+        <form onSubmit={handleSavePassword} noValidate className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
@@ -205,12 +255,13 @@ export const AccountSettings = () => {
               </label>
               <input
                 type="password"
-                required
-                placeholder="••••••••"
+                placeholder="Your current password"
                 value={passForm.currentPassword}
-                onChange={(e) => setPassForm({ ...passForm, currentPassword: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                onChange={(e) => setPassField('currentPassword', e.target.value)}
+                aria-invalid={!!passErrors.currentPassword}
+                className={inputClass(passErrors.currentPassword)}
               />
+              <FieldError message={passErrors.currentPassword} />
             </div>
 
             <div>
@@ -219,12 +270,13 @@ export const AccountSettings = () => {
               </label>
               <input
                 type="password"
-                required
-                placeholder="••••••••"
+                placeholder="At least 8 characters"
                 value={passForm.newPassword}
-                onChange={(e) => setPassForm({ ...passForm, newPassword: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                onChange={(e) => setPassField('newPassword', e.target.value)}
+                aria-invalid={!!passErrors.newPassword}
+                className={inputClass(passErrors.newPassword)}
               />
+              <FieldError message={passErrors.newPassword} />
             </div>
 
             <div>
@@ -233,12 +285,13 @@ export const AccountSettings = () => {
               </label>
               <input
                 type="password"
-                required
-                placeholder="••••••••"
+                placeholder="Repeat the new password"
                 value={passForm.confirmPassword}
-                onChange={(e) => setPassForm({ ...passForm, confirmPassword: e.target.value })}
-                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3.5 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+                onChange={(e) => setPassField('confirmPassword', e.target.value)}
+                aria-invalid={!!passErrors.confirmPassword}
+                className={inputClass(passErrors.confirmPassword)}
               />
+              <FieldError message={passErrors.confirmPassword} />
             </div>
           </div>
 
