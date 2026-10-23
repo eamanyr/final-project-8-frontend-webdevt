@@ -110,7 +110,7 @@ export const LMSProvider = ({ children }) => {
         const parsed = JSON.parse(saved);
         const existingIds = new Set(parsed.map((a) => a.id));
         const missing = INITIAL_ASSIGNMENTS.filter((a) => !existingIds.has(a.id));
-        return [...parsed, ...missing];
+        return [...parsed, ...missing].map((a) => ({ ...a, status: a.status === 'Graded' ? 'Pending' : (a.status || 'Pending') }));
       } catch {
         return INITIAL_ASSIGNMENTS;
       }

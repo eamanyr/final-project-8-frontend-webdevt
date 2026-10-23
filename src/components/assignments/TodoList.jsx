@@ -353,9 +353,9 @@ export const TodoList = () => {
           (String(subStudentId) === String(currentUserId))
         );
       });
-      return hasSubmission || asg.status === 'Graded';
+      return hasSubmission;
     }
-    return asg.status === 'Graded';
+    return false;
   };
 
   // Filter assignments for the user's courses

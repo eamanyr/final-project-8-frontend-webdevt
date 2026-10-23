@@ -442,7 +442,7 @@ export const INITIAL_ASSIGNMENTS = [
     maxScore: 100,
     priority: 'Medium',
     priorityColor: 'forest',
-    status: 'Graded',
+    status: 'Pending',
     rubric: [
       { criteria: 'Palette Balance', points: 40 },
       { criteria: 'Contrast Ratios', points: 30 },
@@ -463,7 +463,7 @@ export const INITIAL_ASSIGNMENTS = [
     maxScore: 100,
     priority: 'High',
     priorityColor: 'gold',
-    status: 'Graded',
+    status: 'Pending',
     rubric: [
       { criteria: 'Nuqta Calibration', points: 50 },
       { criteria: 'Ink Uniformity', points: 25 },

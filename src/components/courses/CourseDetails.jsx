@@ -554,7 +554,7 @@ export const CourseDetails = () => {
     const submitted = (submissions || []).some(
       (s) => s.assignmentId === asg.id && s.studentId === currentUser?.id
     );
-    return submitted || asg.status === 'Graded';
+    return submitted;
   };
 
   const isUnitCompleted = (unit) => {
