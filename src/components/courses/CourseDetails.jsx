@@ -69,6 +69,8 @@ export const CourseDetails = () => {
     submissions,
     viewedLessonIds,
     markLessonAsViewed,
+    viewedMaterialIds,
+    markMaterialAsViewed,
     setSelectedLessonId,
     setActiveTab,
     toggleEnrollCourse,
@@ -551,23 +553,60 @@ export const CourseDetails = () => {
 
   const isAssignmentDone = (asg) => {
     if (!asg) return true;
-    const submitted = (submissions || []).some(
-      (s) => s.assignmentId === asg.id && s.studentId === currentUser?.id
-    );
-    return submitted;
+    const asgId = asg.id || asg._id;
+    const currentUserId = currentUser?.id || currentUser?._id;
+    return (submissions || []).some((s) => {
+      const subAsgId = s?.assignmentId?._id || s?.assignmentId?.id || s?.assignmentId;
+      const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+      return (
+        (String(subAsgId) === String(asgId) || String(subAsgId) === String(asg.id) || String(subAsgId) === String(asg._id)) &&
+        String(subStudentId) === String(currentUserId)
+      );
+    });
+  };
+
+  const isQuizDone = (quiz) => {
+    if (!quiz) return true;
+    const quizId = quiz.id || quiz._id;
+    const currentUserId = currentUser?.id || currentUser?._id;
+    return (quizSubmissions || []).some((s) => {
+      const subQuizId = s?.quizId?._id || s?.quizId?.id || s?.quizId;
+      const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+      return (
+        (String(subQuizId) === String(quizId) || String(subQuizId) === String(quiz.id) || String(subQuizId) === String(quiz._id)) &&
+        String(subStudentId) === String(currentUserId)
+      );
+    });
   };
 
   const isUnitCompleted = (unit) => {
-    const allLessonsViewed = unit.lessons.every((l) =>
+    if (!unit) return false;
+    const allLessonsViewed = (unit.lessons || []).every((l) =>
       viewedLessonIds.includes(l.id)
     );
-    const allTasksDone = unit.assignments.every((a) => isAssignmentDone(a));
-    return allLessonsViewed && allTasksDone;
+    const allTasksDone = (unit.assignments || []).every((a) => isAssignmentDone(a));
+    const allMaterialsViewed = (unit.materials || []).every((m) =>
+      viewedMaterialIds.includes(m.id)
+    );
+    const unitQuizzes = (quizzes || []).filter(
+      (q) =>
+        q.courseId === course.id &&
+        (q.unitIdx !== undefined
+          ? Number(q.unitIdx) === Number(unit.unitIdx)
+          : 0 === Number(unit.unitIdx))
+    );
+    const allQuizzesDone = unitQuizzes.every((q) => isQuizDone(q));
+    return allLessonsViewed && allTasksDone && allMaterialsViewed && allQuizzesDone;
   };
 
   const isUnitUnlocked = (unitIdx) => {
     if (!isStudent || unitIdx === 0) return true;
-    return isUnitCompleted(unitsWithItems[unitIdx - 1]);
+    for (let i = 0; i < unitIdx; i++) {
+      if (!isUnitCompleted(unitsWithItems[i])) {
+        return false;
+      }
+    }
+    return true;
   };
 
   // Enrolled students list (minimum 3 required)
@@ -1116,6 +1155,9 @@ export const CourseDetails = () => {
                             dragOverItem?.index === mIdx &&
                             !isBeingDragged;
 
+                          const isMaterialViewed = viewedMaterialIds.includes(mat.id);
+                          const isMaterialUnlocked = !isStudent || unitUnlocked;
+
                           return (
                             <div
                               key={mat.id}
@@ -1126,14 +1168,24 @@ export const CourseDetails = () => {
                               onDragEnd={handleDragEnd}
                               onClick={() => {
                                 if (isDraggingRef.current) return;
-                                setActiveSection('materials');
+                                if (!isMaterialUnlocked) {
+                                  addToast(
+                                    'Please complete previous unit prerequisites to unlock this learning resource.',
+                                    'info'
+                                  );
+                                  return;
+                                }
+                                markMaterialAsViewed(mat.id);
+                                addToast(`Accessing resource: ${mat.title}.${mat.type || 'pdf'}`, 'success');
                               }}
                               className={`px-5 py-3.5 flex items-center justify-between gap-4 transition-all relative ${
                                 isBeingDragged
                                   ? 'opacity-40 bg-forest-50/70 border-2 border-dashed border-forest/60 scale-[0.99] rounded-xl'
                                   : isTargetOver
                                   ? 'bg-forest-50/50 ring-2 ring-forest rounded-xl shadow-xs'
-                                  : 'hover:bg-cream/40 cursor-pointer group'
+                                  : isMaterialUnlocked
+                                  ? 'hover:bg-cream/40 cursor-pointer group'
+                                  : 'opacity-55 bg-cream/20 cursor-not-allowed'
                               }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
@@ -1146,7 +1198,9 @@ export const CourseDetails = () => {
                                     <GripVertical className="w-4 h-4" />
                                   </div>
                                 )}
-                                <div className="w-8 h-8 rounded-xl bg-sage/20 text-forest flex items-center justify-center shrink-0">
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                                  isMaterialUnlocked ? 'bg-sage/20 text-forest' : 'bg-charcoal/10 text-charcoal-muted'
+                                }`}>
                                   <Paperclip className="w-4 h-4" />
                                 </div>
                                 <div className="min-w-0">
@@ -1155,6 +1209,7 @@ export const CourseDetails = () => {
                                   </span>
                                   <span className="text-[11px] text-charcoal-muted">
                                     Study Resource • {mat.size}
+                                    {isMaterialViewed ? ' • Viewed' : ''}
                                   </span>
                                 </div>
                               </div>
@@ -1188,9 +1243,13 @@ export const CourseDetails = () => {
                                     </button>
                                   </div>
                                 )}
-                                <span className="text-[11px] font-semibold text-forest shrink-0">
-                                  View
-                                </span>
+                                {isMaterialViewed ? (
+                                  <Check className="w-4 h-4 text-forest stroke-[2.5]" />
+                                ) : !isMaterialUnlocked ? (
+                                  <Lock className="w-3.5 h-3.5 text-charcoal-muted" />
+                                ) : (
+                                  <Circle className="w-4 h-4 text-charcoal/25" />
+                                )}
                               </div>
                             </div>
                           );
@@ -1223,10 +1282,17 @@ export const CourseDetails = () => {
                               onClick={() => {
                                 if (isDraggingRef.current) return;
                                 if (!taskUnlocked) {
-                                  addToast(
-                                    'Please view all lessons in this unit before starting the unit task.',
-                                    'info'
-                                  );
+                                  if (!unitUnlocked) {
+                                    addToast(
+                                      'Please complete previous unit prerequisites to unlock this unit task.',
+                                      'info'
+                                    );
+                                  } else {
+                                    addToast(
+                                      'Please view all lessons in this unit before starting the unit task.',
+                                      'info'
+                                    );
+                                  }
                                   return;
                                 }
                                 setAssignmentOrigin('course-details');
@@ -1321,12 +1387,12 @@ export const CourseDetails = () => {
 
                           return unitQuizzes.map((quiz) => {
                             const myQuizSub = (quizSubmissions || []).find(
-                              (s) => s.quizId === quiz.id && s.studentId === currentUser?.id
+                              (s) =>
+                                (s.quizId === quiz.id || s.quizId === quiz._id) &&
+                                (s.studentId === currentUser?.id || s.studentId === currentUser?._id)
                             );
                             const quizDone = Boolean(myQuizSub);
-                            const attemptsCount = (quizSubmissions || []).filter(
-                              (s) => s.quizId === quiz.id
-                            ).length;
+                            const quizUnlocked = !isStudent || quizDone || (unitUnlocked && allLessonsInUnitViewed);
 
                             return (
                               <div
@@ -1335,13 +1401,33 @@ export const CourseDetails = () => {
                                   if (canManageCourse) {
                                     handleOpenEditQuizModal(quiz);
                                   } else {
+                                    if (!unitUnlocked) {
+                                      addToast(
+                                        'Please complete previous unit prerequisites before taking this quiz.',
+                                        'info'
+                                      );
+                                      return;
+                                    }
+                                    if (!allLessonsInUnitViewed && !quizDone) {
+                                      addToast(
+                                        'Please view all lessons in this unit before taking the unit quiz.',
+                                        'info'
+                                      );
+                                      return;
+                                    }
                                     setActiveTakingQuiz(quiz);
                                   }
                                 }}
-                                className="px-5 py-3.5 flex items-center justify-between gap-4 transition-all hover:bg-cream/40 cursor-pointer group border-t border-charcoal/5"
+                                className={`px-5 py-3.5 flex items-center justify-between gap-4 transition-all border-t border-charcoal/5 ${
+                                  quizUnlocked
+                                    ? 'hover:bg-cream/40 cursor-pointer group'
+                                    : 'opacity-55 bg-cream/20 cursor-not-allowed'
+                                }`}
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                                    quizUnlocked ? 'bg-purple-100 text-purple-700' : 'bg-charcoal/10 text-charcoal-muted'
+                                  }`}>
                                     <HelpCircle className="w-4 h-4" />
                                   </div>
                                   <div className="min-w-0">
@@ -1406,6 +1492,30 @@ export const CourseDetails = () => {
                                     >
                                       <Check className="w-3.5 h-3.5" />
                                       <span>Score: {myQuizSub.score}/{myQuizSub.maxScore}</span>
+                                    </button>
+                                  ) : !unitUnlocked ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        addToast('Please complete previous unit prerequisites before taking this quiz.', 'info');
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-charcoal/10 text-charcoal-muted text-[11px] font-bold flex items-center gap-1 cursor-not-allowed"
+                                    >
+                                      <Lock className="w-3.5 h-3.5" />
+                                      <span>Locked</span>
+                                    </button>
+                                  ) : !allLessonsInUnitViewed ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        addToast('Please view all lessons in this unit before taking the unit quiz.', 'info');
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold flex items-center gap-1 cursor-not-allowed"
+                                    >
+                                      <Lock className="w-3.5 h-3.5" />
+                                      <span>Lessons Required</span>
                                     </button>
                                   ) : (
                                     <button
@@ -1523,15 +1633,25 @@ export const CourseDetails = () => {
           ) : (
             <div className="space-y-3">
               {courseMaterials.map((mat) => {
+                const matUnitIdx =
+                  mat.unitIdx !== undefined && mat.unitIdx !== null
+                    ? Number(mat.unitIdx)
+                    : (courseMaterials.indexOf(mat) % (course.syllabus?.length || 1));
+
                 const assignedUnit =
                   mat.unitIdx !== undefined && mat.unitIdx !== null
                     ? course.syllabus?.[mat.unitIdx]?.unit || `Unit ${mat.unitIdx + 1}`
-                    : 'All Units';
+                    : course.syllabus?.[matUnitIdx]?.unit || 'All Units';
+
+                const isMaterialUnlocked = !isStudent || isUnitUnlocked(matUnitIdx);
+                const isViewed = viewedMaterialIds.includes(mat.id);
 
                 return (
                   <div
                     key={mat.id}
-                    className="p-4 rounded-2xl border border-charcoal/10 bg-cream/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
+                    className={`p-4 rounded-2xl border border-charcoal/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${
+                      isMaterialUnlocked ? 'bg-cream/40' : 'bg-cream/20 opacity-65'
+                    }`}
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div className="w-11 h-11 rounded-2xl bg-white border border-charcoal/10 flex items-center justify-center shrink-0 shadow-2xs">
@@ -1557,6 +1677,17 @@ export const CourseDetails = () => {
                           <span className="px-2 py-0.5 rounded-md bg-forest/10 text-forest text-[10px] font-bold">
                             {assignedUnit}
                           </span>
+                          {isStudent && (
+                            !isMaterialUnlocked ? (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-[10px] font-bold border border-amber-200 flex items-center gap-1">
+                                <Lock className="w-3 h-3" /> Locked — Prereq Required
+                              </span>
+                            ) : isViewed ? (
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200 flex items-center gap-1">
+                                <Check className="w-3 h-3" /> Viewed
+                              </span>
+                            ) : null
+                          )}
                         </div>
                         <p className="text-[11px] text-charcoal-muted mt-0.5">
                           Uploaded by {mat.uploadedBy} • {mat.size} • {mat.uploadDate}
@@ -1593,16 +1724,33 @@ export const CourseDetails = () => {
                           </button>
                         </div>
                       )}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          addToast(`Simulating download of ${mat.title}.${mat.type || 'pdf'}`, 'info')
-                        }
-                        className="px-3.5 py-1.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download</span>
-                      </button>
+                      {!isMaterialUnlocked ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            addToast(
+                              'This material is locked. Complete previous unit prerequisites to unlock.',
+                              'warning'
+                            )
+                          }
+                          className="px-3.5 py-1.5 rounded-xl bg-charcoal/10 text-charcoal-muted text-xs font-bold flex items-center gap-1.5 cursor-not-allowed shadow-2xs"
+                        >
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>Locked</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            markMaterialAsViewed(mat.id);
+                            addToast(`Downloading ${mat.title}.${mat.type || 'pdf'}`, 'success');
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>{isViewed ? 'Download Again' : 'Download'}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1642,9 +1790,14 @@ export const CourseDetails = () => {
           ) : (
             <div className="space-y-3">
               {courseAssignments.map((asg) => {
-                const assignedUnit =
+                const asgUnitIdx =
                   asg.unitIdx !== undefined && asg.unitIdx !== null
-                    ? course.syllabus?.[asg.unitIdx]?.unit || `Unit ${asg.unitIdx + 1}`
+                    ? Number(asg.unitIdx)
+                    : null;
+
+                const assignedUnit =
+                  asgUnitIdx !== null
+                    ? course.syllabus?.[asgUnitIdx]?.unit || `Unit ${asgUnitIdx + 1}`
                     : null;
 
                 const asgId = asg?.id || asg?._id;
@@ -1658,14 +1811,24 @@ export const CourseDetails = () => {
                   );
                 }) : null;
 
+                const isTaskUnlocked = !isStudent || Boolean(mySub) || (asgUnitIdx === null || isUnitUnlocked(asgUnitIdx));
+
                 return (
                   <div
                     key={asg.id || asg._id}
                     onClick={() => {
+                      if (!isTaskUnlocked) {
+                        addToast('Please complete previous unit prerequisites to unlock this assignment.', 'warning');
+                        return;
+                      }
                       setSelectedAssignmentId(asg.id || asg._id);
                       setActiveTab('assignment-details');
                     }}
-                    className="p-4 rounded-2xl border border-charcoal/10 bg-cream/40 hover:border-forest/30 hover:shadow-xs transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    className={`p-4 rounded-2xl border border-charcoal/10 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                      isTaskUnlocked
+                        ? 'bg-cream/40 hover:border-forest/30 hover:shadow-xs cursor-pointer'
+                        : 'bg-cream/20 opacity-65 cursor-not-allowed'
+                    }`}
                   >
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1681,7 +1844,11 @@ export const CourseDetails = () => {
                           {asg.priority} Priority
                         </span>
                         {isStudent && (
-                          mySub ? (
+                          !isTaskUnlocked ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                              <Lock className="w-3 h-3" /> Locked — Prereq Required
+                            </span>
+                          ) : mySub ? (
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 ${
                               mySub.status === 'Graded'
                                 ? 'bg-emerald-100 text-emerald-800'
@@ -1736,16 +1903,31 @@ export const CourseDetails = () => {
                           </button>
                         </div>
                       )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAssignmentId(asg.id || asg._id);
-                          setActiveTab('assignment-details');
-                        }}
-                        className="px-4 py-2 rounded-xl bg-charcoal text-cream text-xs font-bold hover:bg-charcoal-light transition-colors"
-                      >
-                        View Task
-                      </button>
+                      {!isTaskUnlocked ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToast('Please complete previous unit prerequisites to unlock this assignment.', 'warning');
+                          }}
+                          className="px-4 py-2 rounded-xl bg-charcoal/10 text-charcoal-muted text-xs font-bold flex items-center gap-1.5 cursor-not-allowed"
+                        >
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>Locked</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedAssignmentId(asg.id || asg._id);
+                            setActiveTab('assignment-details');
+                          }}
+                          className="px-4 py-2 rounded-xl bg-charcoal text-cream text-xs font-bold hover:bg-charcoal-light transition-colors cursor-pointer"
+                        >
+                          View Task
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

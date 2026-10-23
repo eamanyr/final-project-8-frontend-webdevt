@@ -16,6 +16,7 @@ import {
   Edit3,
   ChevronDown,
   ChevronUp,
+  HelpCircle,
 } from 'lucide-react';
 
 export const LessonPage = () => {
@@ -28,6 +29,9 @@ export const LessonPage = () => {
     assignments,
     materials,
     submissions,
+    quizzes,
+    quizSubmissions,
+    viewedMaterialIds,
     currentUser,
     markLessonAsViewed,
     setActiveTab,
@@ -36,6 +40,7 @@ export const LessonPage = () => {
     courseRatings,
     rateCourse,
     markCourseComplete,
+    addToast,
   } = useLMS();
 
   const isTeacher = currentUser?.role === 'teacher';
@@ -79,15 +84,35 @@ export const LessonPage = () => {
       ? currentUnit.lessons[lessonIdxInUnit + 1]
       : null;
 
-  // Check if current unit has an assignment/task to accomplish before moving to next unit
+  // Check if current unit has assignments, materials, or quizzes to accomplish before moving to next unit
   const unitAssignment = currentUnit.assignments?.[0] || null;
   const isUnitAssignmentCompleted = unitAssignment
     ? submissions.some(
         (s) =>
-          s.assignmentId === unitAssignment.id &&
-          s.studentId === currentUser?.id
-      ) || unitAssignment.status === 'Graded'
+          (s.assignmentId === unitAssignment.id || s.assignmentId === unitAssignment._id) &&
+          (s.studentId === currentUser?.id || s.studentId === currentUser?._id)
+      )
     : true;
+
+  const unitMaterials = currentUnit.materials || [];
+  const areUnitMaterialsCompleted = unitMaterials.every((m) =>
+    (viewedMaterialIds || []).includes(m.id)
+  );
+
+  const unitQuizzes = (quizzes || []).filter(
+    (q) =>
+      q.courseId === course.id &&
+      (q.unitIdx !== undefined
+        ? Number(q.unitIdx) === Number(currentUnit.unitIdx)
+        : Number(currentUnit.unitIdx) === 0)
+  );
+  const areUnitQuizzesCompleted = unitQuizzes.every((q) =>
+    (quizSubmissions || []).some(
+      (s) =>
+        (s.quizId === q.id || s.quizId === q._id) &&
+        (s.studentId === currentUser?.id || s.studentId === currentUser?._id)
+    )
+  );
 
   const nextUnitFirstLesson =
     currentUnit.unitIdx < units.length - 1
@@ -733,6 +758,42 @@ export const LessonPage = () => {
                 </span>
               </div>
               <ClipboardCheck className="w-4 h-4 shrink-0" />
+            </button>
+          ) : unitQuizzes.length > 0 && !areUnitQuizzesCompleted ? (
+            <button
+              onClick={() => {
+                setActiveTab('course-details');
+                addToast('Please complete the unit quiz to unlock the next unit.', 'info');
+              }}
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-end gap-2.5 transition-all shadow-sm cursor-pointer"
+            >
+              <div className="text-right">
+                <span className="block text-[10px] text-white/80 uppercase">
+                  Required Unit Quiz to Unlock Next Unit
+                </span>
+                <span className="line-clamp-1">
+                  Take Quiz: {unitQuizzes[0].title}
+                </span>
+              </div>
+              <HelpCircle className="w-4 h-4 shrink-0" />
+            </button>
+          ) : unitMaterials.length > 0 && !areUnitMaterialsCompleted ? (
+            <button
+              onClick={() => {
+                setActiveTab('course-details');
+                addToast('Please review the unit study materials to unlock the next unit.', 'info');
+              }}
+              className="px-5 py-2.5 rounded-xl bg-forest text-cream hover:bg-forest-light text-xs font-bold flex items-center justify-end gap-2.5 transition-all shadow-sm cursor-pointer"
+            >
+              <div className="text-right">
+                <span className="block text-[10px] text-cream/75 uppercase">
+                  Required Unit Learning Material
+                </span>
+                <span className="line-clamp-1">
+                  Review Unit Study Resources
+                </span>
+              </div>
+              <ArrowRight className="w-4 h-4 shrink-0" />
             </button>
           ) : nextUnitFirstLesson ? (
             <button

@@ -371,6 +371,19 @@ export const LMSProvider = ({ children }) => {
     };
   });
 
+  // User-scoped viewed materials: { [userId]: string[] }
+  const [userViewedMaterials, setUserViewedMaterials] = useState(() => {
+    const saved = localStorage.getItem('cacheup_user_viewed_materials');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    return {
+      'usr-1': ['mat-1'],
+    };
+  });
+
   useEffect(() => {
     localStorage.setItem('cacheup_user_viewed_lessons', JSON.stringify(userViewedLessons));
   }, [userViewedLessons]);
@@ -379,7 +392,12 @@ export const LMSProvider = ({ children }) => {
     localStorage.setItem('cacheup_user_completed_courses', JSON.stringify(userCompletedCourses));
   }, [userCompletedCourses]);
 
+  useEffect(() => {
+    localStorage.setItem('cacheup_user_viewed_materials', JSON.stringify(userViewedMaterials));
+  }, [userViewedMaterials]);
+
   const viewedLessonIds = currentUser?.id ? (userViewedLessons[currentUser.id] || []) : [];
+  const viewedMaterialIds = currentUser?.id ? (userViewedMaterials[currentUser.id] || []) : [];
 
   const markLessonAsViewed = (lessonId) => {
     if (!lessonId || !currentUser?.id) return;
@@ -389,6 +407,18 @@ export const LMSProvider = ({ children }) => {
       return {
         ...prev,
         [currentUser.id]: [...userList, lessonId],
+      };
+    });
+  };
+
+  const markMaterialAsViewed = (materialId) => {
+    if (!materialId || !currentUser?.id) return;
+    setUserViewedMaterials((prev) => {
+      const userList = prev[currentUser.id] || [];
+      if (userList.includes(materialId)) return prev;
+      return {
+        ...prev,
+        [currentUser.id]: [...userList, materialId],
       };
     });
   };
@@ -485,6 +515,101 @@ export const LMSProvider = ({ children }) => {
       };
     });
   }, [courses, currentUser, userViewedLessons, userCompletedCourses, customLessons]);
+
+  const isAssignmentDone = (asg, user = currentUser) => {
+    if (!asg) return true;
+    const asgId = asg.id || asg._id;
+    const userId = user?.id || user?._id;
+    return (submissions || []).some((s) => {
+      const subAsgId = s?.assignmentId?._id || s?.assignmentId?.id || s?.assignmentId;
+      const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+      return (
+        (String(subAsgId) === String(asgId) || String(subAsgId) === String(asg.id) || String(subAsgId) === String(asg._id)) &&
+        String(subStudentId) === String(userId)
+      );
+    });
+  };
+
+  const isQuizDone = (quiz, user = currentUser) => {
+    if (!quiz) return true;
+    const quizId = quiz.id || quiz._id;
+    const userId = user?.id || user?._id;
+    return (quizSubmissions || []).some((s) => {
+      const subQuizId = s?.quizId?._id || s?.quizId?.id || s?.quizId;
+      const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+      return (
+        (String(subQuizId) === String(quizId) || String(subQuizId) === String(quiz.id) || String(subQuizId) === String(quiz._id)) &&
+        String(subStudentId) === String(userId)
+      );
+    });
+  };
+
+  const isUnitCompleted = (course, unitIdx, user = currentUser) => {
+    if (!course) return false;
+    const targetUnitIdx = Number(unitIdx);
+
+    // 1. Lessons in this unit
+    const courseCustom = customLessons?.[course.id] || course.customLessons || {};
+    let unitLessons = [];
+    if (
+      courseCustom[targetUnitIdx] &&
+      Array.isArray(courseCustom[targetUnitIdx]) &&
+      courseCustom[targetUnitIdx].length > 0
+    ) {
+      unitLessons = courseCustom[targetUnitIdx];
+    } else {
+      unitLessons = getDefaultUnitLessons(course, targetUnitIdx);
+    }
+    const userViewed = user?.id ? (userViewedLessons[user.id] || []) : [];
+    const allLessonsViewed = unitLessons.every((l) => userViewed.includes(l.id));
+
+    // 2. Materials in this unit
+    const courseMats = (materials || []).filter((m) => m.courseId === course.id);
+    const unitMats = courseMats.filter((m, mIdx) => {
+      if (m.unitIdx !== undefined && m.unitIdx !== null) {
+        return Number(m.unitIdx) === targetUnitIdx;
+      }
+      return mIdx % (course.syllabus?.length || 1) === targetUnitIdx;
+    });
+    const userMats = user?.id ? (userViewedMaterials[user.id] || []) : [];
+    const allMaterialsViewed = unitMats.every((m) => userMats.includes(m.id));
+
+    // 3. Assignments in this unit
+    const courseAsgs = (assignments || []).filter((a) => a.courseId === course.id);
+    const unitAsgs = courseAsgs.filter((a, aIdx) => {
+      if (a.unitIdx !== undefined && a.unitIdx !== null) {
+        return Number(a.unitIdx) === targetUnitIdx;
+      }
+      return aIdx % (course.syllabus?.length || 1) === targetUnitIdx;
+    });
+    const allAssignmentsDone = unitAsgs.every((a) => isAssignmentDone(a, user));
+
+    // 4. Quizzes in this unit
+    const courseQzs = (quizzes || []).filter(
+      (q) =>
+        q.courseId === course.id &&
+        (q.unitIdx !== undefined
+          ? Number(q.unitIdx) === targetUnitIdx
+          : targetUnitIdx === 0)
+    );
+    const allQuizzesDone = courseQzs.every((q) => isQuizDone(q, user));
+
+    return allLessonsViewed && allMaterialsViewed && allAssignmentsDone && allQuizzesDone;
+  };
+
+  const isUnitUnlocked = (course, unitIdx, user = currentUser) => {
+    if (!user || user.role !== 'student') return true;
+    if (!course) return false;
+    const targetUnitIdx = Number(unitIdx);
+    if (targetUnitIdx <= 0) return true;
+
+    for (let i = 0; i < targetUnitIdx; i++) {
+      if (!isUnitCompleted(course, i, user)) {
+        return false;
+      }
+    }
+    return true;
+  };
 
   const setActiveTab = (tab, userOverride) => {
     const targetUser = userOverride !== undefined ? userOverride : currentUser;
@@ -1228,11 +1353,17 @@ export const LMSProvider = ({ children }) => {
       addToast('Unenrolled from course.', 'info');
     } else {
       updatedIds = [...(currentUser.enrolledCourseIds || []), courseId];
-      // Reset any viewed lessons and completion for this course so the student starts fresh at 0% progress
+      // Reset any viewed lessons, viewed materials, and completion for this course so the student starts fresh at 0% progress
       if (currentUser?.id) {
         setUserViewedLessons((prev) => {
           const userList = prev[currentUser.id] || [];
           const cleaned = userList.filter((lid) => !lid.startsWith(`${courseId}-`));
+          return { ...prev, [currentUser.id]: cleaned };
+        });
+        setUserViewedMaterials((prev) => {
+          const userList = prev[currentUser.id] || [];
+          const courseMatIds = materials.filter((m) => m.courseId === courseId).map((m) => m.id);
+          const cleaned = userList.filter((mid) => !courseMatIds.includes(mid));
           return { ...prev, [currentUser.id]: cleaned };
         });
         setUserCompletedCourses((prev) => {
@@ -1965,6 +2096,7 @@ export const LMSProvider = ({ children }) => {
     setCourses(INITIAL_COURSES);
     setUserViewedLessons({ 'usr-1': INITIAL_STELLA_VIEWED_LESSONS });
     setUserCompletedCourses({ 'usr-1': ['crs-3'] });
+    setUserViewedMaterials({ 'usr-1': ['mat-1'] });
     setAssignments(INITIAL_ASSIGNMENTS);
     setSubmissions(INITIAL_SUBMISSIONS);
     setQuizzes(INITIAL_QUIZZES);
@@ -2099,6 +2231,12 @@ export const LMSProvider = ({ children }) => {
         setSelectedLessonId,
         viewedLessonIds,
         markLessonAsViewed,
+        viewedMaterialIds,
+        markMaterialAsViewed,
+        isUnitCompleted,
+        isUnitUnlocked,
+        isAssignmentDone,
+        isQuizDone,
         selectedAssignmentId,
         setSelectedAssignmentId,
         selectedSubmissionId,
