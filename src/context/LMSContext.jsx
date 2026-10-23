@@ -49,6 +49,15 @@ export const LMSProvider = ({ children }) => {
               enrolledCourseIds: init.enrolledCourseIds ?? u.enrolledCourseIds ?? [],
             };
           }
+          if (u.id !== 'usr-1' && u.role === 'student') {
+            return {
+              ...u,
+              points: u.points === 1000 ? 0 : (u.points ?? 0),
+              gpa: u.gpa === '3.80' ? 'N/A' : (u.gpa ?? 'N/A'),
+              streakDays: u.streakDays === 1 ? 0 : (u.streakDays ?? 0),
+              studyHours: u.studyHours === 10 ? 0 : (u.studyHours ?? 0),
+            };
+          }
           return u;
         });
         return [...merged, ...missing];
@@ -62,7 +71,22 @@ export const LMSProvider = ({ children }) => {
   // CHANGED: nobody is logged in by default
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('cacheup_current_user');
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        if (u && u.id !== 'usr-1' && u.role === 'student') {
+          return {
+            ...u,
+            points: u.points === 1000 ? 0 : (u.points ?? 0),
+            gpa: u.gpa === '3.80' ? 'N/A' : (u.gpa ?? 'N/A'),
+            streakDays: u.streakDays === 1 ? 0 : (u.streakDays ?? 0),
+            studyHours: u.studyHours === 10 ? 0 : (u.studyHours ?? 0),
+          };
+        }
+        return u;
+      } catch {}
+    }
+    return null;
   });
 
   const [courses, setCourses] = useState(() => {
@@ -711,7 +735,14 @@ export const LMSProvider = ({ children }) => {
 
         if (isMounted) {
           if (resUsers.status === 'fulfilled' && Array.isArray(resUsers.value) && resUsers.value.length > 0) {
-            setUsers(resUsers.value.map(u => ({ ...u, password: u.password || 'password123' })));
+            setUsers(resUsers.value.map(u => ({
+              ...u,
+              password: u.password || 'password123',
+              points: u.id === 'usr-1' ? u.points : (u.points === 1000 ? 0 : (u.points ?? 0)),
+              gpa: u.id === 'usr-1' ? u.gpa : (u.gpa === '3.80' ? 'N/A' : (u.gpa ?? 'N/A')),
+              streakDays: u.id === 'usr-1' ? u.streakDays : (u.streakDays === 1 ? 0 : (u.streakDays ?? 0)),
+              studyHours: u.id === 'usr-1' ? u.studyHours : (u.studyHours === 10 ? 0 : (u.studyHours ?? 0)),
+            })));
           }
           if (resCourses.status === 'fulfilled' && Array.isArray(resCourses.value) && resCourses.value.length > 0) {
             setCourses(resCourses.value);
@@ -769,6 +800,10 @@ export const LMSProvider = ({ children }) => {
         const loggedUser = {
           ...res.user,
           id: res.user.id || res.user._id,
+          points: res.user.id === 'usr-1' ? res.user.points : (res.user.points === 1000 ? 0 : (res.user.points ?? 0)),
+          gpa: res.user.id === 'usr-1' ? res.user.gpa : (res.user.gpa === '3.80' ? 'N/A' : (res.user.gpa ?? 'N/A')),
+          streakDays: res.user.id === 'usr-1' ? res.user.streakDays : (res.user.streakDays === 1 ? 0 : (res.user.streakDays ?? 0)),
+          studyHours: res.user.id === 'usr-1' ? res.user.studyHours : (res.user.studyHours === 10 ? 0 : (res.user.studyHours ?? 0)),
         };
         setCurrentUser(loggedUser);
         setActiveTab('dashboard', loggedUser);
@@ -873,6 +908,11 @@ export const LMSProvider = ({ children }) => {
           ...res.user,
           id: res.user.id || res.user._id,
           password: formData.password || 'password123',
+          points: res.user.points && res.user.points !== 1000 ? res.user.points : 0,
+          gpa: res.user.gpa && res.user.gpa !== '3.80' ? res.user.gpa : 'N/A',
+          streakDays: res.user.streakDays && res.user.streakDays !== 1 ? res.user.streakDays : 0,
+          studyHours: res.user.studyHours && res.user.studyHours !== 10 ? res.user.studyHours : 0,
+          enrolledCourseIds: res.user.enrolledCourseIds || [],
         };
         setUsers((prev) => [newUser, ...prev.filter((u) => u.id !== newUser.id && u.email?.toLowerCase() !== email)]);
         addToast('Registration submitted! An administrator will review and approve your account.', 'success');
@@ -917,7 +957,7 @@ export const LMSProvider = ({ children }) => {
       enrolledCourseIds: [],
       points: 0,
       gpa: 'N/A',
-      streakDays: 1,
+      streakDays: 0,
       studyHours: 0,
     };
 
@@ -1349,34 +1389,52 @@ export const LMSProvider = ({ children }) => {
     const isEnrolled = currentUser.enrolledCourseIds?.includes(courseId);
     let updatedIds;
     if (isEnrolled) {
-      updatedIds = currentUser.enrolledCourseIds.filter((id) => id !== courseId);
+      updatedIds = (currentUser.enrolledCourseIds || []).filter((id) => id !== courseId);
       addToast('Unenrolled from course.', 'info');
     } else {
       updatedIds = [...(currentUser.enrolledCourseIds || []), courseId];
       // Reset any viewed lessons, viewed materials, and completion for this course so the student starts fresh at 0% progress
-      if (currentUser?.id) {
+      const currentUserId = currentUser.id || currentUser._id;
+      if (currentUserId) {
         setUserViewedLessons((prev) => {
-          const userList = prev[currentUser.id] || [];
+          const userList = prev[currentUserId] || [];
           const cleaned = userList.filter((lid) => !lid.startsWith(`${courseId}-`));
-          return { ...prev, [currentUser.id]: cleaned };
+          return { ...prev, [currentUserId]: cleaned };
         });
         setUserViewedMaterials((prev) => {
-          const userList = prev[currentUser.id] || [];
+          const userList = prev[currentUserId] || [];
           const courseMatIds = materials.filter((m) => m.courseId === courseId).map((m) => m.id);
           const cleaned = userList.filter((mid) => !courseMatIds.includes(mid));
-          return { ...prev, [currentUser.id]: cleaned };
+          return { ...prev, [currentUserId]: cleaned };
         });
         setUserCompletedCourses((prev) => {
-          const userList = prev[currentUser.id] || [];
+          const userList = prev[currentUserId] || [];
           const cleaned = userList.filter((id) => id !== courseId);
-          return { ...prev, [currentUser.id]: cleaned };
+          return { ...prev, [currentUserId]: cleaned };
         });
       }
       addToast('Successfully enrolled! Welcome to the course.', 'success');
     }
+
     const updatedUser = { ...currentUser, enrolledCourseIds: updatedIds };
     setCurrentUser(updatedUser);
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updatedUser : u)));
+
+    setUsers((prev) =>
+      prev.map((u) => {
+        const isMatch =
+          (u.id && (u.id === currentUser.id || u.id === currentUser._id)) ||
+          (u._id && (u._id === currentUser.id || u._id === currentUser._id)) ||
+          (u.email && currentUser.email && u.email.toLowerCase() === currentUser.email.toLowerCase());
+        return isMatch ? { ...u, enrolledCourseIds: updatedIds } : u;
+      })
+    );
+
+    const targetUserId = currentUser.id || currentUser._id;
+    if (targetUserId) {
+      api.users.updateProfile(targetUserId, { enrolledCourseIds: updatedIds }).catch((e) => {
+        console.warn('Backend enrollment sync warning:', e);
+      });
+    }
   };
 
   // Assignment actions

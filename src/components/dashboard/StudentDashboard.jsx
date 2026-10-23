@@ -26,6 +26,7 @@ export const StudentDashboard = () => {
     courses,
     assignments,
     submissions,
+    quizSubmissions,
     setActiveTab,
     setSelectedCourseId,
     setSelectedAssignmentId,
@@ -128,51 +129,134 @@ export const StudentDashboard = () => {
       </div>
 
       {/* Key Academic Metrics Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Overall Progress"
-          value={`${overallProgress}%`}
-          subtitle={
-            enrolledCourses.length > 0
-              ? `Across ${enrolledCourses.length} enrolled ${enrolledCourses.length === 1 ? 'track' : 'tracks'}`
-              : 'No enrolled tracks'
-          }
-          icon={TrendingUp}
-          trend={overallProgress > 0 ? `+${overallProgress}%` : '0%'}
-          trendPositive={overallProgress > 0}
-          colorScheme="forest"
-          onClick={() => setActiveTab('progress')}
-        />
-        <StatCard
-          title="Academy Points"
-          value={`${currentUser?.points || 1450}`}
-          subtitle="Top 5% in cohort"
-          icon={Award}
-          trend="Level 4"
-          trendPositive={true}
-          colorScheme="gold"
-          onClick={() => setActiveTab('progress')}
-        />
-        <StatCard
-          title="Average Score"
-          value={`${currentUser?.gpa || '3.88'} GPA`}
-          subtitle="92.4% exam average"
-          icon={BookOpen}
-          trend="+0.2"
-          trendPositive={true}
-          colorScheme="sage"
-          onClick={() => setActiveTab('grades')}
-        />
-        <StatCard
-          title="Study Streak"
-          value={`${currentUser?.streakDays || 14} Days`}
-          subtitle="42.5 total study hours"
-          icon={Flame}
-          trend="Active"
-          trendPositive={true}
-          colorScheme="gold"
-        />
-      </div>
+      {(() => {
+        const currentUserId = currentUser?.id || currentUser?._id;
+        const isStella = currentUser?.id === 'usr-1';
+
+        const myGradedSubs = (submissions || []).filter(
+          (s) =>
+            (s.studentId === currentUserId ||
+              s.studentId === currentUser?.id ||
+              s.studentId === currentUser?._id) &&
+            s.status === 'Graded'
+        );
+
+        const myQuizSubs = (quizSubmissions || []).filter(
+          (s) =>
+            s.studentId === currentUserId ||
+            s.studentId === currentUser?.id ||
+            s.studentId === currentUser?._id
+        );
+
+        const totalEarnedPoints =
+          myGradedSubs.reduce((acc, s) => acc + (Number(s.score) || 0), 0) +
+          myQuizSubs.reduce((acc, q) => acc + (Number(q.score) || 0), 0);
+
+        const totalMaxPoints =
+          myGradedSubs.reduce((acc, s) => acc + (Number(s.maxScore) || 100), 0) +
+          myQuizSubs.reduce((acc, q) => acc + (Number(q.maxScore) || 100), 0);
+
+        const hasEvaluatedItems =
+          (myGradedSubs.length + myQuizSubs.length) > 0 && totalMaxPoints > 0;
+        const avgScorePercentage = hasEvaluatedItems
+          ? (totalEarnedPoints / totalMaxPoints) * 100
+          : null;
+
+        const calculateGPA = (pct) => {
+          if (pct === null || pct === undefined || isNaN(pct)) return 'N/A';
+          const p = Number(pct);
+          if (p >= 94) return '4.00';
+          if (p >= 90) return '3.70';
+          if (p >= 87) return '3.30';
+          if (p >= 83) return '3.00';
+          if (p >= 80) return '2.70';
+          if (p >= 75) return '2.30';
+          if (p >= 70) return '2.00';
+          if (p >= 60) return '1.00';
+          return '0.00';
+        };
+
+        const displayGPA = hasEvaluatedItems
+          ? calculateGPA(avgScorePercentage)
+          : isStella
+          ? (currentUser?.gpa || '3.80')
+          : (currentUser?.gpa && currentUser.gpa !== '3.80' && currentUser.gpa !== '3.88' ? currentUser.gpa : 'N/A');
+
+        const userPoints = isStella
+          ? (currentUser?.points || 1450)
+          : (currentUser?.points && currentUser.points !== 1000 ? currentUser.points : (hasEvaluatedItems ? totalEarnedPoints : 0));
+
+        const getLevelInfo = (pts) => {
+          if (pts >= 1200) return { level: 'Level 4', rank: 'Top 5% in cohort' };
+          if (pts >= 700) return { level: 'Level 3', rank: 'Top 20% in cohort' };
+          if (pts >= 300) return { level: 'Level 2', rank: 'Active Scholar' };
+          if (pts > 0) return { level: 'Level 1', rank: 'Getting Started' };
+          return { level: 'Level 1', rank: '0 points earned' };
+        };
+        const { level: userLevel, rank: userRank } = getLevelInfo(userPoints);
+
+        const userStreakDays = isStella
+          ? (currentUser?.streakDays || 14)
+          : (currentUser?.streakDays && currentUser.streakDays !== 1 ? currentUser.streakDays : 0);
+
+        const userStudyHours = isStella
+          ? (currentUser?.studyHours || 42.5)
+          : (currentUser?.studyHours && currentUser.studyHours !== 10 ? currentUser.studyHours : 0);
+
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="Overall Progress"
+              value={`${overallProgress}%`}
+              subtitle={
+                enrolledCourses.length > 0
+                  ? `${overallProgress}% Across ${enrolledCourses.length} enrolled ${enrolledCourses.length === 1 ? 'track' : 'tracks'}`
+                  : 'No enrolled tracks'
+              }
+              icon={TrendingUp}
+              trend={overallProgress > 0 ? `+${overallProgress}%` : '0%'}
+              trendPositive={overallProgress > 0}
+              colorScheme="forest"
+              onClick={() => setActiveTab('progress')}
+            />
+            <StatCard
+              title="Academy Points"
+              value={`${userPoints}`}
+              subtitle={userRank}
+              icon={Award}
+              trend={userLevel}
+              trendPositive={userPoints > 0}
+              colorScheme="gold"
+              onClick={() => setActiveTab('progress')}
+            />
+            <StatCard
+              title="Average Score"
+              value={displayGPA === 'N/A' ? 'No Grades' : `${displayGPA} GPA`}
+              subtitle={
+                hasEvaluatedItems
+                  ? `${avgScorePercentage.toFixed(1)}% evaluation average`
+                  : isStella
+                  ? '92.4% exam average'
+                  : 'No graded submissions yet'
+              }
+              icon={BookOpen}
+              trend={hasEvaluatedItems ? (avgScorePercentage >= 70 ? 'In Good Standing' : 'Needs Review') : isStella ? '+0.2' : 'Pending'}
+              trendPositive={hasEvaluatedItems ? avgScorePercentage >= 70 : isStella}
+              colorScheme="sage"
+              onClick={() => setActiveTab('grades')}
+            />
+            <StatCard
+              title="Study Streak"
+              value={`${userStreakDays} ${userStreakDays === 1 ? 'Day' : 'Days'}`}
+              subtitle={`${userStudyHours} total study hours`}
+              icon={Flame}
+              trend={userStreakDays > 0 ? 'Active' : 'Inactive'}
+              trendPositive={userStreakDays > 0}
+              colorScheme="gold"
+            />
+          </div>
+        );
+      })()}
 
       {/* Course Catalog & Enrolled Tracks (Matching Course List Layout in Image 2) */}
       <div className="space-y-4">
