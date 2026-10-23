@@ -89,8 +89,8 @@ export const LMSProvider = ({ children }) => {
               totalLessons,
               syllabus,
               studentsCount: init.studentsCount,
-              completedLessons: c.completedLessons ?? init.completedLessons,
-              progress: c.progress ?? init.progress,
+              completedLessons: 0,
+              progress: 0,
               customLessons: c.customLessons || {},
             };
           }
@@ -309,24 +309,90 @@ export const LMSProvider = ({ children }) => {
   const [selectedCourseId, setSelectedCourseId] = useState('crs-1');
   const [courseActiveTab, setCourseActiveTab] = useState('syllabus');
   const [selectedLessonId, setSelectedLessonId] = useState('crs-1-u1-l1');
-  const [viewedLessonIds, setViewedLessonIds] = useState(() => {
-    const saved = localStorage.getItem('cacheup_viewed_lessons');
+  // Initial viewed lessons for demo student Stella (usr-1)
+  const INITIAL_STELLA_VIEWED_LESSONS = [
+    'crs-1-u1-l1',
+    'crs-1-u1-l2',
+    'crs-1-u1-l3',
+    'crs-1-u2-l1',
+    'crs-1-u2-l2',
+    'crs-2-u1-l1',
+    'crs-2-u1-l2',
+    'crs-3-u1-l1',
+    'crs-3-u1-l2',
+    'crs-3-u1-l3',
+    'crs-3-u2-l1',
+    'crs-3-u2-l2',
+    'crs-3-u3-l1',
+    'crs-3-u3-l2',
+    'crs-4-u1-l1',
+    'crs-4-u1-l2',
+    'crs-4-u1-l3',
+    'crs-4-u2-l1',
+    'crs-5-u1-l1',
+    'crs-5-u1-l2',
+    'crs-5-u2-l1',
+    'crs-6-u1-l1',
+    'crs-6-u1-l2',
+    'crs-6-u1-l3',
+    'crs-6-u2-l1',
+  ];
+
+  // User-scoped viewed lessons: { [userId]: string[] }
+  const [userViewedLessons, setUserViewedLessons] = useState(() => {
+    const saved = localStorage.getItem('cacheup_user_viewed_lessons');
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch {
-        // Fallback
-      }
+      } catch {}
     }
-    return [
-      'crs-1-u1-l1',
-      'crs-1-u1-l2',
-      'crs-2-u1-l1',
-      'crs-3-u1-l1',
-      'crs-3-u2-l1',
-      'crs-3-u3-l1',
-    ];
+    const legacy = localStorage.getItem('cacheup_viewed_lessons');
+    let legacyList = null;
+    if (legacy) {
+      try {
+        legacyList = JSON.parse(legacy);
+      } catch {}
+    }
+    return {
+      'usr-1': Array.isArray(legacyList) && legacyList.length > 0 ? legacyList : INITIAL_STELLA_VIEWED_LESSONS,
+    };
   });
+
+  // User-scoped completed courses: { [userId]: string[] }
+  const [userCompletedCourses, setUserCompletedCourses] = useState(() => {
+    const saved = localStorage.getItem('cacheup_user_completed_courses');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    return {
+      'usr-1': ['crs-3'],
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_user_viewed_lessons', JSON.stringify(userViewedLessons));
+  }, [userViewedLessons]);
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_user_completed_courses', JSON.stringify(userCompletedCourses));
+  }, [userCompletedCourses]);
+
+  const viewedLessonIds = currentUser?.id ? (userViewedLessons[currentUser.id] || []) : [];
+
+  const markLessonAsViewed = (lessonId) => {
+    if (!lessonId || !currentUser?.id) return;
+    setUserViewedLessons((prev) => {
+      const userList = prev[currentUser.id] || [];
+      if (userList.includes(lessonId)) return prev;
+      return {
+        ...prev,
+        [currentUser.id]: [...userList, lessonId],
+      };
+    });
+  };
+
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('asg-1');
   const [selectedSubmissionId, setSelectedSubmissionId] = useState(null);
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState(null);
@@ -338,19 +404,87 @@ export const LMSProvider = ({ children }) => {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
-  const markLessonAsViewed = (lessonId) => {
-    if (!lessonId) return;
-    setViewedLessonIds((prev) =>
-      prev.includes(lessonId) ? prev : [...prev, lessonId]
-    );
+  // Calculate course progress dynamically for any user
+  const calculateCourseProgress = (
+    course,
+    user = currentUser,
+    lessonViewsMap = userViewedLessons,
+    completedMap = userCompletedCourses
+  ) => {
+    if (!course) return { progress: 0, completedLessons: 0, totalLessons: 0 };
+
+    const syllabus = course.syllabus?.length
+      ? course.syllabus
+      : [{ unit: 'Unit 1', title: 'Core Studio Foundations', lessons: 3 }];
+
+    const courseCustom = customLessons?.[course.id] || course.customLessons || {};
+    const allLessonIds = [];
+    syllabus.forEach((unitObj, unitIdx) => {
+      if (
+        courseCustom[unitIdx] &&
+        Array.isArray(courseCustom[unitIdx]) &&
+        courseCustom[unitIdx].length > 0
+      ) {
+        courseCustom[unitIdx].forEach((les, lIdx) => {
+          allLessonIds.push(les.id || `${course.id}-u${unitIdx + 1}-l${lIdx + 1}`);
+        });
+      } else {
+        const defaultLessons = getDefaultUnitLessons(course, unitIdx);
+        defaultLessons.forEach((l) => allLessonIds.push(l.id));
+      }
+    });
+
+    const totalLessons = allLessonIds.length || course.totalLessons || 1;
+
+    if (!user) {
+      return { progress: 0, completedLessons: 0, totalLessons };
+    }
+
+    const isEnrolled = user.enrolledCourseIds?.includes(course.id);
+    if (!isEnrolled) {
+      return { progress: 0, completedLessons: 0, totalLessons };
+    }
+
+    const userCompleted = user.id ? (completedMap[user.id] || []) : [];
+    if (userCompleted.includes(course.id)) {
+      return { progress: 100, completedLessons: totalLessons, totalLessons };
+    }
+
+    const userViews = user.id ? (lessonViewsMap[user.id] || []) : [];
+    const completedCount = allLessonIds.filter((lid) => userViews.includes(lid)).length;
+
+    if (completedCount === 0) {
+      return { progress: 0, completedLessons: 0, totalLessons };
+    }
+
+    const progress = Math.min(100, Math.round((completedCount / totalLessons) * 100));
+    return { progress, completedLessons: completedCount, totalLessons };
   };
 
-  useEffect(() => {
-    localStorage.setItem(
-      'cacheup_viewed_lessons',
-      JSON.stringify(viewedLessonIds)
-    );
-  }, [viewedLessonIds]);
+  const getCourseProgress = (courseId, userOverride) => {
+    const user = userOverride !== undefined ? userOverride : currentUser;
+    const course = courses.find((c) => c.id === courseId);
+    if (!course) return 0;
+    const { progress } = calculateCourseProgress(course, user);
+    return progress;
+  };
+
+  const coursesWithUserProgress = React.useMemo(() => {
+    return courses.map((c) => {
+      const { progress, completedLessons, totalLessons } = calculateCourseProgress(
+        c,
+        currentUser,
+        userViewedLessons,
+        userCompletedCourses
+      );
+      return {
+        ...c,
+        totalLessons,
+        completedLessons,
+        progress,
+      };
+    });
+  }, [courses, currentUser, userViewedLessons, userCompletedCourses, customLessons]);
 
   const setActiveTab = (tab, userOverride) => {
     const targetUser = userOverride !== undefined ? userOverride : currentUser;
@@ -1094,6 +1228,19 @@ export const LMSProvider = ({ children }) => {
       addToast('Unenrolled from course.', 'info');
     } else {
       updatedIds = [...(currentUser.enrolledCourseIds || []), courseId];
+      // Reset any viewed lessons and completion for this course so the student starts fresh at 0% progress
+      if (currentUser?.id) {
+        setUserViewedLessons((prev) => {
+          const userList = prev[currentUser.id] || [];
+          const cleaned = userList.filter((lid) => !lid.startsWith(`${courseId}-`));
+          return { ...prev, [currentUser.id]: cleaned };
+        });
+        setUserCompletedCourses((prev) => {
+          const userList = prev[currentUser.id] || [];
+          const cleaned = userList.filter((id) => id !== courseId);
+          return { ...prev, [currentUser.id]: cleaned };
+        });
+      }
       addToast('Successfully enrolled! Welcome to the course.', 'success');
     }
     const updatedUser = { ...currentUser, enrolledCourseIds: updatedIds };
@@ -1726,7 +1873,16 @@ export const LMSProvider = ({ children }) => {
       };
     });
 
-    // Also update course progress to 100% and recalculate average rating
+    // Mark course as completed for this student
+    if (student.id) {
+      setUserCompletedCourses((prev) => {
+        const userList = prev[student.id] || [];
+        if (userList.includes(courseId)) return prev;
+        return { ...prev, [student.id]: [...userList, courseId] };
+      });
+    }
+
+    // Recalculate average rating on course
     setCourses((prevCourses) =>
       prevCourses.map((c) => {
         if (c.id === courseId) {
@@ -1740,8 +1896,6 @@ export const LMSProvider = ({ children }) => {
           return {
             ...c,
             rating: parseFloat(avg),
-            progress: 100,
-            completedLessons: c.totalLessons,
           };
         }
         return c;
@@ -1766,13 +1920,40 @@ export const LMSProvider = ({ children }) => {
   };
 
   const markCourseComplete = (courseId) => {
-    setCourses((prev) =>
-      prev.map((c) =>
-        c.id === courseId
-          ? { ...c, progress: 100, completedLessons: c.totalLessons }
-          : c
-      )
-    );
+    if (!currentUser?.id) return;
+    setUserCompletedCourses((prev) => {
+      const userList = prev[currentUser.id] || [];
+      if (userList.includes(courseId)) return prev;
+      return { ...prev, [currentUser.id]: [...userList, courseId] };
+    });
+
+    const course = courses.find((c) => c.id === courseId);
+    if (course) {
+      const syllabus = course.syllabus?.length
+        ? course.syllabus
+        : [{ unit: 'Unit 1', title: 'Core Studio Foundations', lessons: 3 }];
+      const courseCustom = customLessons?.[course.id] || course.customLessons || {};
+      const allLessonIds = [];
+      syllabus.forEach((unitObj, unitIdx) => {
+        if (
+          courseCustom[unitIdx] &&
+          Array.isArray(courseCustom[unitIdx]) &&
+          courseCustom[unitIdx].length > 0
+        ) {
+          courseCustom[unitIdx].forEach((les, lIdx) => {
+            allLessonIds.push(les.id || `${course.id}-u${unitIdx + 1}-l${lIdx + 1}`);
+          });
+        } else {
+          const defaultLessons = getDefaultUnitLessons(course, unitIdx);
+          defaultLessons.forEach((l) => allLessonIds.push(l.id));
+        }
+      });
+      setUserViewedLessons((prev) => {
+        const userList = prev[currentUser.id] || [];
+        const set = new Set([...userList, ...allLessonIds]);
+        return { ...prev, [currentUser.id]: Array.from(set) };
+      });
+    }
     addToast('🎉 Congratulations! Course marked as completed. You can now rate it!', 'success');
   };
 
@@ -1782,6 +1963,8 @@ export const LMSProvider = ({ children }) => {
     setUsers(INITIAL_USERS);
     setCurrentUser(INITIAL_USERS[0]);
     setCourses(INITIAL_COURSES);
+    setUserViewedLessons({ 'usr-1': INITIAL_STELLA_VIEWED_LESSONS });
+    setUserCompletedCourses({ 'usr-1': ['crs-3'] });
     setAssignments(INITIAL_ASSIGNMENTS);
     setSubmissions(INITIAL_SUBMISSIONS);
     setQuizzes(INITIAL_QUIZZES);
@@ -1841,7 +2024,9 @@ export const LMSProvider = ({ children }) => {
         updateProfile,
 
         // Data
-        courses,
+        courses: coursesWithUserProgress,
+        rawCourses: courses,
+        getCourseProgress,
         customLessons,
         assignments,
         submissions,

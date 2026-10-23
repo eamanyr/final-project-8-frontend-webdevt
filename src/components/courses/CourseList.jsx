@@ -43,7 +43,7 @@ export const CourseList = () => {
     if (isStudent) {
       const isEnrolled = currentUser?.enrolledCourseIds?.includes(course.id);
       if (activeTabFilter === 'enrolled' && !isEnrolled) return false;
-      if (activeTabFilter === 'completed' && course.progress < 100) return false;
+      if (activeTabFilter === 'completed' && (course.progress || 0) < 100) return false;
     }
 
     // Search query filter
@@ -264,12 +264,12 @@ export const CourseList = () => {
                     <div className="mt-4 p-2.5 rounded-xl bg-cream/70 border border-charcoal/5">
                       <div className="flex items-center justify-between text-xs font-bold mb-1">
                         <span className="text-charcoal-muted">Course Completion</span>
-                        <span className="text-forest">{course.progress}%</span>
+                        <span className="text-forest">{course.progress || 0}%</span>
                       </div>
                       <div className="w-full h-2 rounded-full bg-charcoal/10 overflow-hidden">
                         <div
                           className="h-full rounded-full bg-forest transition-all duration-500"
-                          style={{ width: `${course.progress}%` }}
+                          style={{ width: `${course.progress || 0}%` }}
                         />
                       </div>
                     </div>

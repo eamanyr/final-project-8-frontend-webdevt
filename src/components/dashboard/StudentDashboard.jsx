@@ -37,10 +37,18 @@ export const StudentDashboard = () => {
   );
 
   const filteredCourses = enrolledCourses.filter((c) => {
-    if (courseFilter === 'active') return c.progress < 100;
-    if (courseFilter === 'completed') return c.progress === 100;
+    if (courseFilter === 'active') return (c.progress || 0) < 100;
+    if (courseFilter === 'completed') return (c.progress || 0) === 100;
     return true;
   });
+
+  const overallProgress =
+    enrolledCourses.length > 0
+      ? Math.round(
+          enrolledCourses.reduce((sum, c) => sum + (c.progress || 0), 0) /
+            enrolledCourses.length
+        )
+      : 0;
 
   const pendingAssignments = assignments
     .filter((asg) => {
@@ -100,11 +108,15 @@ export const StudentDashboard = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Overall Progress"
-          value="75%"
-          subtitle="Across 3 enrolled tracks"
+          value={`${overallProgress}%`}
+          subtitle={
+            enrolledCourses.length > 0
+              ? `Across ${enrolledCourses.length} enrolled ${enrolledCourses.length === 1 ? 'track' : 'tracks'}`
+              : 'No enrolled tracks'
+          }
           icon={TrendingUp}
-          trend="+12%"
-          trendPositive={true}
+          trend={overallProgress > 0 ? `+${overallProgress}%` : '0%'}
+          trendPositive={overallProgress > 0}
           colorScheme="forest"
           onClick={() => setActiveTab('progress')}
         />
