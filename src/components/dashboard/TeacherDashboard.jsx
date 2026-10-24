@@ -30,7 +30,14 @@ export const TeacherDashboard = () => {
 
   // Filter courses taught by this teacher
   const myCourses = courses.filter(
-    (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
+    (c) =>
+      c.instructorId === currentUser?.id ||
+      (currentUser?._id && c.instructorId === currentUser?._id) ||
+      currentUser?.assignedCourseIds?.includes(c.id) ||
+      (c._id && currentUser?.assignedCourseIds?.includes(c._id)) ||
+      (c.instructorName &&
+        currentUser?.name &&
+        c.instructorName.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
   );
 
   // Filter pending submissions strictly for courses taught by this teacher

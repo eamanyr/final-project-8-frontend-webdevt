@@ -34,11 +34,19 @@ export const LearningMaterials = () => {
   } = useLMS();
 
   const isTeacher = currentUser?.role === 'teacher';
-  const availableCourses = isTeacher
+  const teacherCourses = isTeacher
     ? courses.filter(
-        (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
+        (c) =>
+          c.instructorId === currentUser?.id ||
+          (currentUser?._id && c.instructorId === currentUser?._id) ||
+          currentUser?.assignedCourseIds?.includes(c.id) ||
+          (c._id && currentUser?.assignedCourseIds?.includes(c._id)) ||
+          (c.instructorName &&
+            currentUser?.name &&
+            c.instructorName.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
       )
     : courses;
+  const availableCourses = isTeacher && teacherCourses.length > 0 ? teacherCourses : courses;
 
   const [courseFilter, setCourseFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
