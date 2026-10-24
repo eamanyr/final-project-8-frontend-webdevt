@@ -3,6 +3,7 @@ import { useLMS } from '../../context/LMSContext';
 import { buildCourseUnitsWithItems } from '../../data/courseCurriculum';
 import {
   ArrowLeft,
+  Award,
   GripVertical,
   Users,
   FileText,
@@ -33,7 +34,10 @@ import {
   Image as ImageIcon,
   Trash2,
   X,
+  HelpCircle,
 } from 'lucide-react';
+import { QuizModal } from '../quizzes/QuizModal';
+import { QuizTakeModal } from '../quizzes/QuizTakeModal';
 
 export const CourseDetails = () => {
   const {
@@ -65,21 +69,45 @@ export const CourseDetails = () => {
     submissions,
     viewedLessonIds,
     markLessonAsViewed,
+    viewedMaterialIds,
+    markMaterialAsViewed,
     setSelectedLessonId,
     setActiveTab,
     toggleEnrollCourse,
     setSelectedAssignmentId,
-    setAssignmentOrigin,
+    quizzes,
+    quizSubmissions,
+    deleteQuiz,
     addToast,
     courseMeetings,
     saveCourseMeeting,
     removeCourseMeeting,
+    courseActiveTab,
+    setCourseActiveTab,
   } = useLMS();
 
-  const [activeTab, setActiveSection] = useState('syllabus');
+  const [activeTab, setActiveSection] = useState(courseActiveTab || 'syllabus');
+  const [selectedGradeStudentId, setSelectedGradeStudentId] = useState('');
+
+  React.useEffect(() => {
+    if (courseActiveTab) {
+      setActiveSection(courseActiveTab);
+    }
+  }, [courseActiveTab]);
+
+  const handleTabChange = (tab) => {
+    setActiveSection(tab);
+    if (setCourseActiveTab) setCourseActiveTab(tab);
+  };
   const [openUnits, setOpenUnits] = useState({ 0: true, 1: true, 2: true });
   const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Quiz Modal states
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+  const [editingQuiz, setEditingQuiz] = useState(null);
+  const [selectedUnitIdxForQuiz, setSelectedUnitIdxForQuiz] = useState(0);
+  const [activeTakingQuiz, setActiveTakingQuiz] = useState(null);
   const [meetingForm, setMeetingForm] = useState({
     title: '',
     meetUrl: '',
@@ -120,6 +148,11 @@ export const CourseDetails = () => {
     maxScore: 100,
     priority: 'Medium',
     submissionTypes: ['pdf', 'link'],
+    rubric: [
+      { criteria: 'Technical Execution & Precision', points: 40 },
+      { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
+      { criteria: 'Documentation & Presentation', points: 25 },
+    ],
   });
 
   // Modal states for materials
@@ -359,6 +392,19 @@ export const CourseDetails = () => {
     setOpenUnits((prev) => ({ ...prev, [selectedUnitIdxForLesson]: true }));
   };
 
+  // Quiz Handlers
+  const handleOpenAddQuizModal = (unitIdx = 0) => {
+    setSelectedUnitIdxForQuiz(Number(unitIdx) || 0);
+    setEditingQuiz(null);
+    setIsQuizModalOpen(true);
+  };
+
+  const handleOpenEditQuizModal = (quiz) => {
+    setSelectedUnitIdxForQuiz(quiz.unitIdx !== undefined ? Number(quiz.unitIdx) : 0);
+    setEditingQuiz(quiz);
+    setIsQuizModalOpen(true);
+  };
+
   // Assignment Handlers
   const handleOpenAddAssignmentModal = (unitIdx = 0) => {
     const targetIdx = Number(unitIdx) || 0;
@@ -374,6 +420,11 @@ export const CourseDetails = () => {
       maxScore: 100,
       priority: 'Medium',
       submissionTypes: ['pdf', 'link'],
+      rubric: [
+        { criteria: 'Technical Execution & Precision', points: 40 },
+        { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
+        { criteria: 'Documentation & Presentation', points: 25 },
+      ],
     });
     setIsAssignmentModalOpen(true);
   };
@@ -391,6 +442,11 @@ export const CourseDetails = () => {
       maxScore: asg.maxScore || 100,
       priority: asg.priority || 'Medium',
       submissionTypes: asg.submissionTypes || ['pdf', 'link'],
+      rubric: asg.rubric && asg.rubric.length ? asg.rubric : [
+        { criteria: 'Technical Execution & Precision', points: 40 },
+        { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
+        { criteria: 'Documentation & Presentation', points: 25 },
+      ],
     });
     setIsAssignmentModalOpen(true);
   };
@@ -402,6 +458,9 @@ export const CourseDetails = () => {
       return;
     }
 
+    const totalRubricPts = assignmentFormData.rubric.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
+    const finalMaxScore = totalRubricPts > 0 ? totalRubricPts : parseInt(assignmentFormData.maxScore) || 100;
+
     const payload = {
       courseId: course.id,
       courseName: course.title,
@@ -410,9 +469,10 @@ export const CourseDetails = () => {
       description: assignmentFormData.description.trim() || 'Complete the assigned task and submit your work.',
       dueDate: assignmentFormData.dueDate,
       dueTime: assignmentFormData.dueTime || '11:59 PM',
-      maxScore: parseInt(assignmentFormData.maxScore) || 100,
+      maxScore: finalMaxScore,
       priority: assignmentFormData.priority || 'Medium',
       submissionTypes: assignmentFormData.submissionTypes || ['pdf', 'link'],
+      rubric: assignmentFormData.rubric,
     };
 
     if (editingAssignmentId) {
@@ -493,29 +553,88 @@ export const CourseDetails = () => {
 
   const isAssignmentDone = (asg) => {
     if (!asg) return true;
-    const submitted = (submissions || []).some(
-      (s) => s.assignmentId === asg.id && s.studentId === currentUser?.id
-    );
-    return submitted || asg.status === 'Graded';
+    const asgId = asg.id || asg._id;
+    const currentUserId = currentUser?.id || currentUser?._id;
+    return (submissions || []).some((s) => {
+      const subAsgId = s?.assignmentId?._id || s?.assignmentId?.id || s?.assignmentId;
+      const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+      return (
+        (String(subAsgId) === String(asgId) || String(subAsgId) === String(asg.id) || String(subAsgId) === String(asg._id)) &&
+        String(subStudentId) === String(currentUserId)
+      );
+    });
+  };
+
+  const isQuizDone = (quiz) => {
+    if (!quiz) return true;
+    const quizId = quiz.id || quiz._id;
+    const currentUserId = currentUser?.id || currentUser?._id;
+    return (quizSubmissions || []).some((s) => {
+      const subQuizId = s?.quizId?._id || s?.quizId?.id || s?.quizId;
+      const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+      return (
+        (String(subQuizId) === String(quizId) || String(subQuizId) === String(quiz.id) || String(subQuizId) === String(quiz._id)) &&
+        String(subStudentId) === String(currentUserId)
+      );
+    });
   };
 
   const isUnitCompleted = (unit) => {
-    const allLessonsViewed = unit.lessons.every((l) =>
+    if (!unit) return false;
+    const allLessonsViewed = (unit.lessons || []).every((l) =>
       viewedLessonIds.includes(l.id)
     );
-    const allTasksDone = unit.assignments.every((a) => isAssignmentDone(a));
-    return allLessonsViewed && allTasksDone;
+    const allTasksDone = (unit.assignments || []).every((a) => isAssignmentDone(a));
+    const allMaterialsViewed = (unit.materials || []).every((m) =>
+      viewedMaterialIds.includes(m.id)
+    );
+    const unitQuizzes = (quizzes || []).filter(
+      (q) =>
+        q.courseId === course.id &&
+        (q.unitIdx !== undefined
+          ? Number(q.unitIdx) === Number(unit.unitIdx)
+          : 0 === Number(unit.unitIdx))
+    );
+    const allQuizzesDone = unitQuizzes.every((q) => isQuizDone(q));
+    return allLessonsViewed && allTasksDone && allMaterialsViewed && allQuizzesDone;
   };
 
   const isUnitUnlocked = (unitIdx) => {
     if (!isStudent || unitIdx === 0) return true;
-    return isUnitCompleted(unitsWithItems[unitIdx - 1]);
+    for (let i = 0; i < unitIdx; i++) {
+      if (!isUnitCompleted(unitsWithItems[i])) {
+        return false;
+      }
+    }
+    return true;
   };
 
   // Enrolled students list (minimum 3 required)
-  const enrolledStudents = users.filter(
-    (u) => u.role === 'student' && u.enrolledCourseIds?.includes(course.id)
-  );
+  const enrolledStudents = React.useMemo(() => {
+    const list = (users || []).filter((u) => {
+      if (u.role !== 'student') return false;
+      const enrolled = Array.isArray(u.enrolledCourseIds) ? u.enrolledCourseIds : [];
+      return enrolled.includes(course.id) || (course._id && enrolled.includes(course._id));
+    });
+
+    const isCurrentEnrolled =
+      currentUser?.role === 'student' &&
+      (currentUser.enrolledCourseIds?.includes(course.id) || (course._id && currentUser.enrolledCourseIds?.includes(course._id)));
+
+    if (isCurrentEnrolled) {
+      const currentId = currentUser?.id || currentUser?._id;
+      const alreadyInList = list.some(
+        (u) =>
+          (u.id && (u.id === currentId || u.id === currentUser?.id || u.id === currentUser?._id)) ||
+          (u._id && (u._id === currentId || u._id === currentUser?.id || u._id === currentUser?._id)) ||
+          (u.email && currentUser.email && u.email.toLowerCase() === currentUser.email.toLowerCase())
+      );
+      if (!alreadyInList) {
+        return [currentUser, ...list];
+      }
+    }
+    return list;
+  }, [users, currentUser, course]);
 
   // Assigned course instructor (1 teacher)
   const courseTeacher =
@@ -745,7 +864,7 @@ export const CourseDetails = () => {
       {/* Internal Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-charcoal/10 pb-2 overflow-x-auto">
         <button
-          onClick={() => setActiveSection('syllabus')}
+          onClick={() => handleTabChange('syllabus')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'syllabus'
               ? 'bg-forest text-cream shadow-xs'
@@ -755,7 +874,7 @@ export const CourseDetails = () => {
           Syllabus & Units
         </button>
         <button
-          onClick={() => setActiveSection('materials')}
+          onClick={() => handleTabChange('materials')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'materials'
               ? 'bg-forest text-cream shadow-xs'
@@ -775,7 +894,18 @@ export const CourseDetails = () => {
           Assignments ({courseAssignments.length})
         </button>
         <button
-          onClick={() => setActiveSection('meet')}
+          onClick={() => handleTabChange('grades')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 ${
+            activeTab === 'grades'
+              ? 'bg-forest text-cream shadow-xs'
+              : 'text-charcoal-muted hover:text-charcoal'
+          }`}
+        >
+          <Award className="w-3.5 h-3.5" />
+          <span>Grades</span>
+        </button>
+        <button
+          onClick={() => handleTabChange('meet')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2 ${
             activeTab === 'meet'
               ? 'bg-forest text-cream shadow-xs'
@@ -789,7 +919,7 @@ export const CourseDetails = () => {
           )}
         </button>
         <button
-          onClick={() => setActiveSection('students')}
+          onClick={() => handleTabChange('students')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'students'
               ? 'bg-forest text-cream shadow-xs'
@@ -1047,6 +1177,9 @@ export const CourseDetails = () => {
                             dragOverItem?.index === mIdx &&
                             !isBeingDragged;
 
+                          const isMaterialViewed = viewedMaterialIds.includes(mat.id);
+                          const isMaterialUnlocked = !isStudent || unitUnlocked;
+
                           return (
                             <div
                               key={mat.id}
@@ -1057,14 +1190,24 @@ export const CourseDetails = () => {
                               onDragEnd={handleDragEnd}
                               onClick={() => {
                                 if (isDraggingRef.current) return;
-                                setActiveSection('materials');
+                                if (!isMaterialUnlocked) {
+                                  addToast(
+                                    'Please complete previous unit prerequisites to unlock this learning resource.',
+                                    'info'
+                                  );
+                                  return;
+                                }
+                                markMaterialAsViewed(mat.id);
+                                addToast(`Accessing resource: ${mat.title}.${mat.type || 'pdf'}`, 'success');
                               }}
                               className={`px-5 py-3.5 flex items-center justify-between gap-4 transition-all relative ${
                                 isBeingDragged
                                   ? 'opacity-40 bg-forest-50/70 border-2 border-dashed border-forest/60 scale-[0.99] rounded-xl'
                                   : isTargetOver
                                   ? 'bg-forest-50/50 ring-2 ring-forest rounded-xl shadow-xs'
-                                  : 'hover:bg-cream/40 cursor-pointer group'
+                                  : isMaterialUnlocked
+                                  ? 'hover:bg-cream/40 cursor-pointer group'
+                                  : 'opacity-55 bg-cream/20 cursor-not-allowed'
                               }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
@@ -1077,7 +1220,9 @@ export const CourseDetails = () => {
                                     <GripVertical className="w-4 h-4" />
                                   </div>
                                 )}
-                                <div className="w-8 h-8 rounded-xl bg-sage/20 text-forest flex items-center justify-center shrink-0">
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                                  isMaterialUnlocked ? 'bg-sage/20 text-forest' : 'bg-charcoal/10 text-charcoal-muted'
+                                }`}>
                                   <Paperclip className="w-4 h-4" />
                                 </div>
                                 <div className="min-w-0">
@@ -1086,6 +1231,7 @@ export const CourseDetails = () => {
                                   </span>
                                   <span className="text-[11px] text-charcoal-muted">
                                     Study Resource • {mat.size}
+                                    {isMaterialViewed ? ' • Viewed' : ''}
                                   </span>
                                 </div>
                               </div>
@@ -1119,9 +1265,13 @@ export const CourseDetails = () => {
                                     </button>
                                   </div>
                                 )}
-                                <span className="text-[11px] font-semibold text-forest shrink-0">
-                                  View
-                                </span>
+                                {isMaterialViewed ? (
+                                  <Check className="w-4 h-4 text-forest stroke-[2.5]" />
+                                ) : !isMaterialUnlocked ? (
+                                  <Lock className="w-3.5 h-3.5 text-charcoal-muted" />
+                                ) : (
+                                  <Circle className="w-4 h-4 text-charcoal/25" />
+                                )}
                               </div>
                             </div>
                           );
@@ -1154,10 +1304,17 @@ export const CourseDetails = () => {
                               onClick={() => {
                                 if (isDraggingRef.current) return;
                                 if (!taskUnlocked) {
-                                  addToast(
-                                    'Please view all lessons in this unit before starting the unit task.',
-                                    'info'
-                                  );
+                                  if (!unitUnlocked) {
+                                    addToast(
+                                      'Please complete previous unit prerequisites to unlock this unit task.',
+                                      'info'
+                                    );
+                                  } else {
+                                    addToast(
+                                      'Please view all lessons in this unit before starting the unit task.',
+                                      'info'
+                                    );
+                                  }
                                   return;
                                 }
                                 setAssignmentOrigin('course-details');
@@ -1240,6 +1397,167 @@ export const CourseDetails = () => {
                           );
                         })}
 
+                        {/* Quizzes in this Curriculum Unit */}
+                        {(() => {
+                          const unitQuizzes = (quizzes || []).filter(
+                            (q) =>
+                              q.courseId === course.id &&
+                              (q.unitIdx !== undefined
+                                ? Number(q.unitIdx) === Number(unit.unitIdx)
+                                : 0 === Number(unit.unitIdx))
+                          );
+
+                          return unitQuizzes.map((quiz) => {
+                            const myQuizSub = (quizSubmissions || []).find(
+                              (s) =>
+                                (s.quizId === quiz.id || s.quizId === quiz._id) &&
+                                (s.studentId === currentUser?.id || s.studentId === currentUser?._id)
+                            );
+                            const quizDone = Boolean(myQuizSub);
+                            const quizUnlocked = !isStudent || quizDone || (unitUnlocked && allLessonsInUnitViewed);
+
+                            return (
+                              <div
+                                key={quiz.id}
+                                onClick={() => {
+                                  if (canManageCourse) {
+                                    handleOpenEditQuizModal(quiz);
+                                  } else {
+                                    if (!unitUnlocked) {
+                                      addToast(
+                                        'Please complete previous unit prerequisites before taking this quiz.',
+                                        'info'
+                                      );
+                                      return;
+                                    }
+                                    if (!allLessonsInUnitViewed && !quizDone) {
+                                      addToast(
+                                        'Please view all lessons in this unit before taking the unit quiz.',
+                                        'info'
+                                      );
+                                      return;
+                                    }
+                                    setActiveTakingQuiz(quiz);
+                                  }
+                                }}
+                                className={`px-5 py-3.5 flex items-center justify-between gap-4 transition-all border-t border-charcoal/5 ${
+                                  quizUnlocked
+                                    ? 'hover:bg-cream/40 cursor-pointer group'
+                                    : 'opacity-55 bg-cream/20 cursor-not-allowed'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                                    quizUnlocked ? 'bg-purple-100 text-purple-700' : 'bg-charcoal/10 text-charcoal-muted'
+                                  }`}>
+                                    <HelpCircle className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-xs sm:text-sm font-bold text-charcoal group-hover:text-forest transition-colors break-words leading-snug">
+                                        Multiple Choice Quiz: {quiz.title}
+                                      </h4>
+                                      <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                                        {quiz.questions?.length || 0} Questions
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-charcoal-muted mt-0.5">
+                                      Due {quiz.dueDate} • {quiz.totalPoints} pts • Limit: {quiz.duration || '20 min'} • Auto-Graded
+                                      {quizDone
+                                        ? ` • Score: ${myQuizSub.score}/${myQuizSub.maxScore}`
+                                        : ''}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="shrink-0 flex items-center gap-2">
+                                  {canManageCourse ? (
+                                    <div
+                                      className="flex items-center gap-1.5"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        Auto-Graded
+                                      </span>
+                                      <div className="flex items-center gap-1 bg-cream/70 rounded-xl p-0.5 border border-charcoal/10">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenEditQuizModal(quiz)}
+                                          title="Edit Quiz"
+                                          className="p-1 rounded-lg text-charcoal-muted hover:text-purple-700 hover:bg-white transition-colors cursor-pointer"
+                                        >
+                                          <Edit className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (confirm(`Delete quiz "${quiz.title}"?`)) {
+                                              deleteQuiz(quiz.id);
+                                            }
+                                          }}
+                                          title="Delete Quiz"
+                                          className="p-1 rounded-lg text-charcoal-muted hover:text-red-600 hover:bg-white transition-colors cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : quizDone ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveTakingQuiz(quiz);
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 text-[11px] font-bold flex items-center gap-1 hover:bg-emerald-200 cursor-pointer"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                      <span>Score: {myQuizSub.score}/{myQuizSub.maxScore}</span>
+                                    </button>
+                                  ) : !unitUnlocked ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        addToast('Please complete previous unit prerequisites before taking this quiz.', 'info');
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-charcoal/10 text-charcoal-muted text-[11px] font-bold flex items-center gap-1 cursor-not-allowed"
+                                    >
+                                      <Lock className="w-3.5 h-3.5" />
+                                      <span>Locked</span>
+                                    </button>
+                                  ) : !allLessonsInUnitViewed ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        addToast('Please view all lessons in this unit before taking the unit quiz.', 'info');
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold flex items-center gap-1 cursor-not-allowed"
+                                    >
+                                      <Lock className="w-3.5 h-3.5" />
+                                      <span>Lessons Required</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveTakingQuiz(quiz);
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
+                                    >
+                                      <HelpCircle className="w-3.5 h-3.5" />
+                                      <span>Take Quiz</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+
                         {/* Unit Controls for Instructor & Admin */}
                         {canManageCourse && (
                           <div className="px-5 py-3 bg-forest-50/50 border-t border-charcoal/10 flex flex-wrap items-center justify-between gap-2.5">
@@ -1263,6 +1581,14 @@ export const CourseDetails = () => {
                               >
                                 <Rocket className="w-3.5 h-3.5 text-gold-dark" />
                                 <span>+ Add Assignment</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAddQuizModal(unit.unitIdx)}
+                                className="px-3 py-1.5 rounded-xl border border-purple-300 bg-white hover:bg-purple-50 text-purple-800 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                              >
+                                <HelpCircle className="w-3.5 h-3.5 text-purple-700" />
+                                <span>+ Add Quiz</span>
                               </button>
                               <button
                                 type="button"
@@ -1329,15 +1655,25 @@ export const CourseDetails = () => {
           ) : (
             <div className="space-y-3">
               {courseMaterials.map((mat) => {
+                const matUnitIdx =
+                  mat.unitIdx !== undefined && mat.unitIdx !== null
+                    ? Number(mat.unitIdx)
+                    : (courseMaterials.indexOf(mat) % (course.syllabus?.length || 1));
+
                 const assignedUnit =
                   mat.unitIdx !== undefined && mat.unitIdx !== null
                     ? course.syllabus?.[mat.unitIdx]?.unit || `Unit ${mat.unitIdx + 1}`
-                    : 'All Units';
+                    : course.syllabus?.[matUnitIdx]?.unit || 'All Units';
+
+                const isMaterialUnlocked = !isStudent || isUnitUnlocked(matUnitIdx);
+                const isViewed = viewedMaterialIds.includes(mat.id);
 
                 return (
                   <div
                     key={mat.id}
-                    className="p-4 rounded-2xl border border-charcoal/10 bg-cream/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
+                    className={`p-4 rounded-2xl border border-charcoal/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${
+                      isMaterialUnlocked ? 'bg-cream/40' : 'bg-cream/20 opacity-65'
+                    }`}
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div className="w-11 h-11 rounded-2xl bg-white border border-charcoal/10 flex items-center justify-center shrink-0 shadow-2xs">
@@ -1363,6 +1699,17 @@ export const CourseDetails = () => {
                           <span className="px-2 py-0.5 rounded-md bg-forest/10 text-forest text-[10px] font-bold">
                             {assignedUnit}
                           </span>
+                          {isStudent && (
+                            !isMaterialUnlocked ? (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-[10px] font-bold border border-amber-200 flex items-center gap-1">
+                                <Lock className="w-3 h-3" /> Locked — Prereq Required
+                              </span>
+                            ) : isViewed ? (
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200 flex items-center gap-1">
+                                <Check className="w-3 h-3" /> Viewed
+                              </span>
+                            ) : null
+                          )}
                         </div>
                         <p className="text-[11px] text-charcoal-muted mt-0.5">
                           Uploaded by {mat.uploadedBy} • {mat.size} • {mat.uploadDate}
@@ -1399,16 +1746,33 @@ export const CourseDetails = () => {
                           </button>
                         </div>
                       )}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          addToast(`Simulating download of ${mat.title}.${mat.type || 'pdf'}`, 'info')
-                        }
-                        className="px-3.5 py-1.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download</span>
-                      </button>
+                      {!isMaterialUnlocked ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            addToast(
+                              'This material is locked. Complete previous unit prerequisites to unlock.',
+                              'warning'
+                            )
+                          }
+                          className="px-3.5 py-1.5 rounded-xl bg-charcoal/10 text-charcoal-muted text-xs font-bold flex items-center gap-1.5 cursor-not-allowed shadow-2xs"
+                        >
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>Locked</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            markMaterialAsViewed(mat.id);
+                            addToast(`Downloading ${mat.title}.${mat.type || 'pdf'}`, 'success');
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>{isViewed ? 'Download Again' : 'Download'}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1448,19 +1812,45 @@ export const CourseDetails = () => {
           ) : (
             <div className="space-y-3">
               {courseAssignments.map((asg) => {
-                const assignedUnit =
+                const asgUnitIdx =
                   asg.unitIdx !== undefined && asg.unitIdx !== null
-                    ? course.syllabus?.[asg.unitIdx]?.unit || `Unit ${asg.unitIdx + 1}`
+                    ? Number(asg.unitIdx)
                     : null;
+
+                const assignedUnit =
+                  asgUnitIdx !== null
+                    ? course.syllabus?.[asgUnitIdx]?.unit || `Unit ${asgUnitIdx + 1}`
+                    : null;
+
+                const asgId = asg?.id || asg?._id;
+                const currentUserId = currentUser?.id || currentUser?._id;
+                const mySub = isStudent ? (submissions || []).find((s) => {
+                  const subAsgId = s?.assignmentId?._id || s?.assignmentId?.id || s?.assignmentId;
+                  const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+                  return (
+                    (String(subAsgId) === String(asgId) || String(subAsgId) === String(asg?.id) || String(subAsgId) === String(asg?._id)) &&
+                    (String(subStudentId) === String(currentUserId))
+                  );
+                }) : null;
+
+                const isTaskUnlocked = !isStudent || Boolean(mySub) || (asgUnitIdx === null || isUnitUnlocked(asgUnitIdx));
 
                 return (
                   <div
-                    key={asg.id}
+                    key={asg.id || asg._id}
                     onClick={() => {
-                      setSelectedAssignmentId(asg.id);
+                      if (!isTaskUnlocked) {
+                        addToast('Please complete previous unit prerequisites to unlock this assignment.', 'warning');
+                        return;
+                      }
+                      setSelectedAssignmentId(asg.id || asg._id);
                       setActiveTab('assignment-details');
                     }}
-                    className="p-4 rounded-2xl border border-charcoal/10 bg-cream/40 hover:border-forest/30 hover:shadow-xs transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    className={`p-4 rounded-2xl border border-charcoal/10 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                      isTaskUnlocked
+                        ? 'bg-cream/40 hover:border-forest/30 hover:shadow-xs cursor-pointer'
+                        : 'bg-cream/20 opacity-65 cursor-not-allowed'
+                    }`}
                   >
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1475,6 +1865,27 @@ export const CourseDetails = () => {
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold/20 text-gold-dark">
                           {asg.priority} Priority
                         </span>
+                        {isStudent && (
+                          !isTaskUnlocked ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                              <Lock className="w-3 h-3" /> Locked — Prereq Required
+                            </span>
+                          ) : mySub ? (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 ${
+                              mySub.status === 'Graded'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-emerald-50 text-emerald-700'
+                            }`}>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>{mySub.status === 'Graded' ? `Graded: ${mySub.score}/${asg.maxScore}` : 'Submitted'}</span>
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              <span>Awaiting Submission</span>
+                            </span>
+                          )
+                        )}
                       </div>
                       <p className="text-xs text-charcoal-muted mt-1 max-w-xl">
                         {asg.description}
@@ -1514,16 +1925,31 @@ export const CourseDetails = () => {
                           </button>
                         </div>
                       )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAssignmentId(asg.id);
-                          setActiveTab('assignment-details');
-                        }}
-                        className="px-4 py-2 rounded-xl bg-charcoal text-cream text-xs font-bold hover:bg-charcoal-light transition-colors"
-                      >
-                        View Task
-                      </button>
+                      {!isTaskUnlocked ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToast('Please complete previous unit prerequisites to unlock this assignment.', 'warning');
+                          }}
+                          className="px-4 py-2 rounded-xl bg-charcoal/10 text-charcoal-muted text-xs font-bold flex items-center gap-1.5 cursor-not-allowed"
+                        >
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>Locked</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedAssignmentId(asg.id || asg._id);
+                            setActiveTab('assignment-details');
+                          }}
+                          className="px-4 py-2 rounded-xl bg-charcoal text-cream text-xs font-bold hover:bg-charcoal-light transition-colors cursor-pointer"
+                        >
+                          View Task
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1533,7 +1959,390 @@ export const CourseDetails = () => {
         </div>
       )}
 
-      {/* Tab: Google Meet Live Classroom */}
+            {/* Tab: Course Grades (Scores from assignments & tasks + total grade) */}
+      {activeTab === 'grades' && (() => {
+        const effectiveStudentId = (currentUser?.role === 'teacher' || currentUser?.role === 'admin')
+          ? (selectedGradeStudentId || enrolledStudents[0]?.id || currentUser?.id)
+          : currentUser?.id;
+        const targetStudent = users.find((u) => u.id === effectiveStudentId) || currentUser;
+
+        const courseQuizzes = (quizzes || []).filter((q) => q.courseId === course.id);
+
+        const getLetter = (pct) => {
+          const n = Number(pct);
+          if (n >= 94) return 'A';
+          if (n >= 90) return 'A-';
+          if (n >= 87) return 'B+';
+          if (n >= 83) return 'B';
+          if (n >= 80) return 'B-';
+          if (n >= 75) return 'C+';
+          if (n >= 70) return 'C';
+          if (n >= 60) return 'D';
+          return 'F';
+        };
+
+        // Assignment grade rows
+        const assignmentRows = courseAssignments.map((a) => {
+          const sub = submissions.find(
+            (s) => s.assignmentId === a.id && s.studentId === effectiveStudentId
+          );
+          const isGraded = sub?.status === 'Graded';
+          const isSubmitted = sub && sub.status !== 'Pending';
+          const score = isGraded ? Number(sub.score) : 0;
+          const max = Number(a.maxScore) || 100;
+          const pct = isGraded ? Math.round((score / max) * 100) : null;
+          const letter = isGraded ? getLetter(pct) : '—';
+
+          return {
+            assignment: a,
+            submission: sub,
+            status: isGraded ? 'Graded' : isSubmitted ? 'Submitted' : 'Not Submitted',
+            isGraded,
+            score,
+            max,
+            pct,
+            letter,
+            feedback: sub?.feedback || '',
+            rubricScores: sub?.rubricScores || null,
+          };
+        });
+
+        // Quiz grade rows
+        const quizRows = courseQuizzes.map((q) => {
+          const qSub = (quizSubmissions || []).find(
+            (qs) => qs.quizId === q.id && qs.studentId === effectiveStudentId
+          );
+          const isCompleted = !!qSub;
+          const score = isCompleted ? Number(qSub.score) : 0;
+          const max = Number(q.totalPoints) || 40;
+          const pct = isCompleted ? qSub.percentage : null;
+          const letter = isCompleted ? getLetter(pct) : '—';
+
+          return {
+            quiz: q,
+            submission: qSub,
+            isCompleted,
+            score,
+            max,
+            pct,
+            letter,
+            passed: qSub ? qSub.passed : false,
+            submittedAt: qSub?.submittedAt || '',
+          };
+        });
+
+        // Compute Total Course Grade
+        const gradedAsgs = assignmentRows.filter((r) => r.isGraded);
+        const completedQuizzes = quizRows.filter((r) => r.isCompleted);
+
+        const earnedPoints =
+          gradedAsgs.reduce((acc, r) => acc + r.score, 0) +
+          completedQuizzes.reduce((acc, r) => acc + r.score, 0);
+
+        const maxPointsEvaluated =
+          gradedAsgs.reduce((acc, r) => acc + r.max, 0) +
+          completedQuizzes.reduce((acc, r) => acc + r.max, 0);
+
+        const coursePotentialMax =
+          assignmentRows.reduce((acc, r) => acc + r.max, 0) +
+          quizRows.reduce((acc, r) => acc + r.max, 0);
+
+        const hasEvaluated = maxPointsEvaluated > 0 && (gradedAsgs.length + completedQuizzes.length) > 0;
+
+        const totalPercentage =
+          hasEvaluated
+            ? ((earnedPoints / maxPointsEvaluated) * 100).toFixed(1)
+            : null;
+
+        const totalLetter = hasEvaluated ? getLetter(totalPercentage) : '—';
+        const completedCount = gradedAsgs.length + completedQuizzes.length;
+        const totalItemsCount = assignmentRows.length + quizRows.length;
+
+        return (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Overall Course Grade Summary Card */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-charcoal/10 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-charcoal/10">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-forest px-2.5 py-0.5 rounded-full bg-forest/10 inline-block mb-1">
+                    Course Gradebook & Cumulative Evaluation
+                  </span>
+                  <h3 className="text-xl font-bold font-heading text-charcoal">
+                    {course.code} Total Course Grade
+                  </h3>
+                  <p className="text-xs text-charcoal-muted mt-0.5">
+                    Evaluated scores for <strong className="text-charcoal">{targetStudent?.name}</strong> across all assignments, tasks, and quizzes.
+                  </p>
+                </div>
+
+                {/* Switch student dropdown for Teachers/Admins */}
+                {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && enrolledStudents.length > 0 && (
+                  <div className="flex items-center gap-2 self-start sm:self-auto bg-cream/70 p-2 rounded-2xl border border-charcoal/10">
+                    <span className="text-xs font-bold text-charcoal pl-1">Learner:</span>
+                    <select
+                      value={effectiveStudentId}
+                      onChange={(e) => setSelectedGradeStudentId(e.target.value)}
+                      className="bg-white border border-charcoal/15 text-xs font-semibold rounded-xl px-3 py-1.5 text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/20"
+                    >
+                      {enrolledStudents.map((st) => (
+                        <option key={st.id} value={st.id}>
+                          {st.name} ({st.studentId || 'ID'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* KPI Performance Highlights */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6">
+                <div className="p-4 rounded-2xl bg-forest/5 border border-forest/15 flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-forest text-gold flex items-center justify-center font-heading text-2xl font-extrabold shadow-xs shrink-0">
+                    {totalLetter}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-charcoal-muted block">
+                      Total Course Grade
+                    </span>
+                    <div className="text-xl font-bold text-forest font-heading">
+                      {hasEvaluated ? `${totalPercentage}%` : 'No Grades Yet'}
+                    </div>
+                    <span className="text-[10px] text-emerald-700 font-semibold">
+                      {hasEvaluated
+                        ? (Number(totalPercentage) >= 80 ? 'In Good Academic Standing' : 'Passing Mark')
+                        : 'No graded assignments or quizzes yet'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-cream/60 border border-charcoal/10 flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gold/20 text-gold-dark flex items-center justify-center font-bold shrink-0">
+                    <Award className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-charcoal-muted block">
+                      Total Score / Points
+                    </span>
+                    <div className="text-xl font-bold text-charcoal font-heading font-mono">
+                      {earnedPoints} / {maxPointsEvaluated}{' '}
+                      <span className="text-xs font-normal text-charcoal-muted">pts</span>
+                    </div>
+                    <span className="text-[10px] text-charcoal-muted">
+                      Out of {coursePotentialMax} total course points
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-cream/60 border border-charcoal/10 flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+                    <CheckCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-charcoal-muted block">
+                      Completed Assessments
+                    </span>
+                    <div className="text-xl font-bold text-charcoal font-heading">
+                      {completedCount} of {totalItemsCount}{' '}
+                      <span className="text-xs font-normal text-charcoal-muted">tasks</span>
+                    </div>
+                    <span className="text-[10px] text-charcoal-muted">
+                      {assignmentRows.length} Assignments • {quizRows.length} Quizzes
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Assignments & Studio Tasks Table */}
+            <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-forest" />
+                  <h4 className="text-sm font-bold font-heading text-charcoal">
+                    Assignment & Studio Tasks
+                  </h4>
+                </div>
+                <span className="text-xs font-bold text-charcoal-muted">
+                  {assignmentRows.length} Tasks
+                </span>
+              </div>
+
+              {assignmentRows.length === 0 ? (
+                <p className="text-xs text-charcoal-muted py-6 text-center">
+                  No assignments posted for this course.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-charcoal/10 text-[10px] font-bold uppercase tracking-wider text-charcoal-muted">
+                        <th className="pb-3 font-bold">Task Name</th>
+                        <th className="pb-3 font-bold">Due Date</th>
+                        <th className="pb-3 font-bold">Status</th>
+                        <th className="pb-3 font-bold">Score</th>
+                        <th className="pb-3 font-bold">Grade</th>
+                        <th className="pb-3 font-bold">Evaluator Feedback</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-charcoal/5">
+                      {assignmentRows.map((row) => (
+                        <tr key={row.assignment.id} className="hover:bg-cream/20 transition-colors">
+                          <td className="py-3.5 pr-4">
+                            <div className="font-bold text-charcoal">{row.assignment.title}</div>
+                            <div className="text-[11px] text-charcoal-muted">
+                              {row.assignment.priority} Priority • Max {row.assignment.maxScore} pts
+                            </div>
+                          </td>
+                          <td className="py-3.5 text-charcoal-muted whitespace-nowrap">
+                            {row.assignment.dueDate}
+                          </td>
+                          <td className="py-3.5 whitespace-nowrap">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                row.status === 'Graded'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : row.status === 'Submitted'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-charcoal/10 text-charcoal-muted'
+                              }`}
+                            >
+                              {row.status}
+                            </span>
+                          </td>
+                          <td className="py-3.5 font-mono font-bold text-charcoal whitespace-nowrap">
+                            {row.isGraded ? `${row.score} / ${row.max} pts` : '—'}
+                          </td>
+                          <td className="py-3.5 whitespace-nowrap">
+                            {row.isGraded ? (
+                              <span className="px-2 py-0.5 rounded-md bg-forest/10 text-forest font-extrabold text-xs">
+                                {row.letter} ({row.pct}%)
+                              </span>
+                            ) : (
+                              <span className="text-charcoal-muted">—</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 max-w-xs text-charcoal-muted">
+                            {row.feedback ? (
+                              <div className="text-[11px] leading-snug">
+                                <span className="italic text-charcoal">"{row.feedback}"</span>
+                                {row.rubricScores && (
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    {Object.entries(row.rubricScores).map(([k, v]) => (
+                                      <span
+                                        key={k}
+                                        className="text-[9px] bg-cream px-1.5 py-0.5 rounded border border-charcoal/10"
+                                      >
+                                        {k}: {v} pts
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-charcoal-muted italic text-[11px]">
+                                {row.isGraded ? 'No feedback recorded' : 'Awaiting critique'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Quizzes & Objective Tasks Table */}
+            <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-purple-700" />
+                  <h4 className="text-sm font-bold font-heading text-charcoal">
+                    Quizzes & Knowledge Checks
+                  </h4>
+                </div>
+                <span className="text-xs font-bold text-charcoal-muted">
+                  {quizRows.length} Quizzes
+                </span>
+              </div>
+
+              {quizRows.length === 0 ? (
+                <p className="text-xs text-charcoal-muted py-6 text-center">
+                  No quizzes published for this course yet.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-charcoal/10 text-[10px] font-bold uppercase tracking-wider text-charcoal-muted">
+                        <th className="pb-3 font-bold">Quiz Assessment</th>
+                        <th className="pb-3 font-bold">Due Date</th>
+                        <th className="pb-3 font-bold">Status</th>
+                        <th className="pb-3 font-bold">Score</th>
+                        <th className="pb-3 font-bold">Grade</th>
+                        <th className="pb-3 font-bold">Outcome</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-charcoal/5">
+                      {quizRows.map((row) => (
+                        <tr key={row.quiz.id} className="hover:bg-cream/20 transition-colors">
+                          <td className="py-3.5 pr-4">
+                            <div className="font-bold text-charcoal">{row.quiz.title}</div>
+                            <div className="text-[11px] text-charcoal-muted">
+                              {row.quiz.duration} • Pass mark: {row.quiz.passingScorePercent || 70}%
+                            </div>
+                          </td>
+                          <td className="py-3.5 text-charcoal-muted whitespace-nowrap">
+                            {row.quiz.dueDate}
+                          </td>
+                          <td className="py-3.5 whitespace-nowrap">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                row.isCompleted
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-charcoal/10 text-charcoal-muted'
+                              }`}
+                            >
+                              {row.isCompleted ? 'Completed' : 'Not Attempted'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 font-mono font-bold text-charcoal whitespace-nowrap">
+                            {row.isCompleted ? `${row.score} / ${row.max} pts` : '—'}
+                          </td>
+                          <td className="py-3.5 whitespace-nowrap">
+                            {row.isCompleted ? (
+                              <span className="px-2 py-0.5 rounded-md bg-forest/10 text-forest font-extrabold text-xs">
+                                {row.letter} ({row.pct}%)
+                              </span>
+                            ) : (
+                              <span className="text-charcoal-muted">—</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 whitespace-nowrap">
+                            {row.isCompleted ? (
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                  row.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {row.passed ? 'Passed' : 'Needs Review'}
+                              </span>
+                            ) : (
+                              <span className="text-charcoal-muted italic text-[11px]">Pending attempt</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+{/* Tab: Google Meet Live Classroom */}
       {activeTab === 'meet' && (
         <div className="space-y-4">
           {/* Header Card */}
@@ -1832,17 +2641,22 @@ export const CourseDetails = () => {
                     className="w-11 h-11 rounded-2xl object-cover border border-charcoal/10 shadow-2xs shrink-0"
                   />
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-xs font-bold text-charcoal truncate">{st.name}</h4>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h4 className="text-xs font-bold text-charcoal truncate">{st.name}</h4>
+                      {(st.id === currentUser?.id || st._id === currentUser?._id || (st.email && currentUser?.email && st.email.toLowerCase() === currentUser?.email?.toLowerCase())) && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-forest text-cream">
+                          You
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-charcoal-muted truncate">{st.email}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[10px] font-mono font-bold text-forest bg-forest/10 px-1.5 py-0.5 rounded-md">
                         {st.studentId || 'STUDENT'}
                       </span>
-                      {st.gpa && (
-                        <span className="text-[10px] font-semibold text-charcoal-muted">
-                          GPA: {st.gpa}
-                        </span>
-                      )}
+                      <span className="text-[10px] font-semibold text-charcoal-muted">
+                        GPA: {st.gpa && st.gpa !== '3.80' && st.gpa !== '0.00' ? st.gpa : (st.id === 'usr-1' ? '3.80' : 'N/A')}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2587,6 +3401,113 @@ export const CourseDetails = () => {
                 />
               </div>
 
+              {/* Rubric Criteria Builder & Modifier */}
+              <div className="pt-1">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <label className="block text-xs font-bold text-charcoal uppercase tracking-wider">
+                      Evaluation Rubric &amp; Criteria Breakdown
+                    </label>
+                    <p className="text-[10px] text-charcoal-muted">
+                      Add, adjust, or remove criteria. Points update automatically.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssignmentFormData((prev) => {
+                        const updated = [
+                          ...(prev.rubric || []),
+                          { criteria: 'New Evaluation Criterion', points: 10 },
+                        ];
+                        const sum = updated.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
+                        return { ...prev, rubric: updated, maxScore: sum };
+                      });
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-forest hover:text-gold cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Criterion</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {(assignmentFormData.rubric || []).map((r, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 p-2 rounded-xl bg-cream/40 border border-charcoal/10"
+                    >
+                      <input
+                        type="text"
+                        value={r.criteria}
+                        onChange={(e) => {
+                          const updated = [...assignmentFormData.rubric];
+                          updated[idx] = { ...updated[idx], criteria: e.target.value };
+                          setAssignmentFormData({ ...assignmentFormData, rubric: updated });
+                        }}
+                        placeholder="Criterion description"
+                        className="flex-1 bg-white border border-charcoal/15 rounded-lg px-2.5 py-1.5 text-xs text-charcoal focus:outline-hidden focus:border-forest font-medium"
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        max="200"
+                        value={r.points}
+                        onChange={(e) => {
+                          const updated = [...assignmentFormData.rubric];
+                          updated[idx] = {
+                            ...updated[idx],
+                            points: Math.max(0, parseInt(e.target.value) || 0),
+                          };
+                          const sum = updated.reduce(
+                            (acc, item) => acc + (Number(item.points) || 0),
+                            0
+                          );
+                          setAssignmentFormData({
+                            ...assignmentFormData,
+                            rubric: updated,
+                            maxScore: sum,
+                          });
+                        }}
+                        className="w-16 bg-white border border-charcoal/15 rounded-lg px-2 py-1.5 text-xs text-charcoal text-center font-bold font-mono focus:outline-hidden focus:border-forest"
+                      />
+                      <span className="text-[11px] text-charcoal-muted">Pts</span>
+                      {(assignmentFormData.rubric || []).length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = assignmentFormData.rubric.filter((_, i) => i !== idx);
+                            const sum = updated.reduce(
+                              (acc, item) => acc + (Number(item.points) || 0),
+                              0
+                            );
+                            setAssignmentFormData({
+                              ...assignmentFormData,
+                              rubric: updated,
+                              maxScore: sum > 0 ? sum : assignmentFormData.maxScore,
+                            });
+                          }}
+                          className="p-1 text-charcoal-muted hover:text-red-600 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-2 text-right">
+                  <span className="text-xs font-bold text-forest font-mono">
+                    Total Rubric Points:{' '}
+                    {(assignmentFormData.rubric || []).reduce(
+                      (acc, r) => acc + (Number(r.points) || 0),
+                      0
+                    )}{' '}
+                    pts
+                  </span>
+                </div>
+              </div>
+
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-charcoal/10">
                 <button
@@ -2610,6 +3531,30 @@ export const CourseDetails = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal: Quiz Creator & Editor for Teachers */}
+      {isQuizModalOpen && (
+        <QuizModal
+          course={course}
+          editingQuiz={editingQuiz}
+          initialUnitIdx={selectedUnitIdxForQuiz}
+          onClose={() => {
+            setIsQuizModalOpen(false);
+            setEditingQuiz(null);
+          }}
+        />
+      )}
+
+      {/* Modal: Student Take Quiz & Instant Grade Review */}
+      {activeTakingQuiz && (
+        <QuizTakeModal
+          quiz={activeTakingQuiz}
+          existingSubmission={(quizSubmissions || []).find(
+            (s) => s.quizId === activeTakingQuiz.id && s.studentId === currentUser?.id
+          )}
+          onClose={() => setActiveTakingQuiz(null)}
+        />
       )}
     </div>
   );

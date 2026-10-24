@@ -14,6 +14,8 @@ import {
   Presentation,
   ExternalLink,
   CheckCircle,
+  Check,
+  Lock,
   X
 } from 'lucide-react';
 
@@ -22,6 +24,9 @@ export const LearningMaterials = () => {
     materials,
     courses,
     currentUser,
+    viewedMaterialIds,
+    markMaterialAsViewed,
+    isUnitUnlocked,
     addMaterial,
     updateMaterial,
     deleteMaterial,
@@ -186,86 +191,145 @@ export const LearningMaterials = () => {
 
       {/* Materials List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredMaterials.map((mat) => (
-          <div
-            key={mat.id}
-            className="bg-white rounded-3xl p-5 border border-charcoal/10 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow"
-          >
-            <div>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-cream border border-charcoal/10 flex items-center justify-center shrink-0">
-                    {getTypeIcon(mat.type)}
+        {filteredMaterials.map((mat) => {
+          const isStudent = currentUser?.role === 'student';
+          const isEnrolled = !currentUser || !isStudent || (currentUser.enrolledCourseIds || []).includes(mat.courseId);
+          const targetCourse = courses.find((c) => c.id === mat.courseId);
+
+          const courseMats = materials.filter((m) => m.courseId === mat.courseId);
+          const mIdx = courseMats.findIndex((m) => m.id === mat.id);
+          const matUnitIdx =
+            mat.unitIdx !== undefined && mat.unitIdx !== null && mat.unitIdx !== 'all'
+              ? Number(mat.unitIdx)
+              : (mIdx >= 0 ? mIdx % (targetCourse?.syllabus?.length || 1) : 0);
+
+          const unitUnlocked = !isStudent || !isEnrolled ? false : (isUnitUnlocked ? isUnitUnlocked(targetCourse, matUnitIdx, currentUser) : true);
+          const isAccessible = !isStudent || (isEnrolled && unitUnlocked);
+          const isViewed = (viewedMaterialIds || []).includes(mat.id);
+
+          return (
+            <div
+              key={mat.id}
+              className={`bg-white rounded-3xl p-5 border border-charcoal/10 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow ${
+                !isAccessible && isStudent ? 'opacity-70' : ''
+              }`}
+            >
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-12 h-12 rounded-2xl border border-charcoal/10 flex items-center justify-center shrink-0 ${
+                      isAccessible ? 'bg-cream text-forest' : 'bg-charcoal/5 text-charcoal-muted'
+                    }`}>
+                      {getTypeIcon(mat.type)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-forest">
+                          {mat.courseTitle}
+                        </span>
+                        {isStudent && !isEnrolled && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> Enroll Required
+                          </span>
+                        )}
+                        {isStudent && isEnrolled && !unitUnlocked && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> Locked (Prereq Required)
+                          </span>
+                        )}
+                        {isStudent && isAccessible && isViewed && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                            <Check className="w-2.5 h-2.5" /> Viewed
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-bold text-charcoal font-heading mt-0.5 line-clamp-1">
+                        {mat.title}
+                      </h4>
+                      <p className="text-[11px] text-charcoal-muted mt-1 leading-snug line-clamp-2">
+                        {mat.description}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-forest">
-                      {mat.courseTitle}
-                    </span>
-                    <h4 className="text-sm font-bold text-charcoal font-heading mt-0.5 line-clamp-1">
-                      {mat.title}
-                    </h4>
-                    <p className="text-[11px] text-charcoal-muted mt-1 leading-snug">
-                      {mat.description}
-                    </p>
-                  </div>
+
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cream border border-charcoal/10 text-charcoal uppercase tracking-wider">
+                    {mat.type}
+                  </span>
                 </div>
+              </div>
 
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cream border border-charcoal/10 text-charcoal uppercase tracking-wider">
-                  {mat.type}
+              {/* Footer */}
+              <div className="mt-5 pt-3 border-t border-charcoal/10 flex items-center justify-between text-xs">
+                <span className="text-charcoal-muted text-[11px]">
+                  {mat.size} • Uploaded {mat.uploadDate}
                 </span>
-              </div>
-            </div>
 
-            {/* Footer */}
-            <div className="mt-5 pt-3 border-t border-charcoal/10 flex items-center justify-between text-xs">
-              <span className="text-charcoal-muted text-[11px]">
-                {mat.size} • Uploaded {mat.uploadDate}
-              </span>
+                <div className="flex items-center gap-2">
+                  {isTeacherOrAdmin && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditingMaterialId(mat.id);
+                          setNewMaterial({
+                            courseId: mat.courseId || availableCourses[0]?.id || 'crs-1',
+                            unitIdx: mat.unitIdx !== undefined ? mat.unitIdx : 'all',
+                            title: mat.title || '',
+                            type: mat.type || 'pdf',
+                            size: mat.size || '3.8 MB',
+                            description: mat.description || '',
+                          });
+                          setShowUploadModal(true);
+                        }}
+                        className="p-1.5 text-charcoal-muted hover:text-forest rounded-lg transition-colors cursor-pointer"
+                        title="Edit Resource"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Remove ${mat.title}?`)) deleteMaterial(mat.id);
+                        }}
+                        className="p-1.5 text-charcoal-muted hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                        title="Delete Resource"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
 
-              <div className="flex items-center gap-2">
-                {isTeacherOrAdmin && (
-                  <>
+                  {isStudent && !isAccessible ? (
                     <button
                       onClick={() => {
-                        setEditingMaterialId(mat.id);
-                        setNewMaterial({
-                          courseId: mat.courseId || availableCourses[0]?.id || 'crs-1',
-                          unitIdx: mat.unitIdx !== undefined ? mat.unitIdx : 'all',
-                          title: mat.title || '',
-                          type: mat.type || 'pdf',
-                          size: mat.size || '3.8 MB',
-                          description: mat.description || '',
-                        });
-                        setShowUploadModal(true);
+                        if (!isEnrolled) {
+                          addToast('Please enroll in this course first to access its learning materials.', 'warning');
+                        } else {
+                          addToast('This material is locked. Complete previous unit prerequisites to unlock.', 'warning');
+                        }
                       }}
-                      className="p-1.5 text-charcoal-muted hover:text-forest rounded-lg transition-colors cursor-pointer"
-                      title="Edit Resource"
+                      className="px-3.5 py-1.5 rounded-xl bg-charcoal/10 text-charcoal-muted text-xs font-bold flex items-center gap-1.5 cursor-not-allowed"
                     >
-                      <Edit className="w-4 h-4" />
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Locked</span>
                     </button>
+                  ) : (
                     <button
                       onClick={() => {
-                        if (confirm(`Remove ${mat.title}?`)) deleteMaterial(mat.id);
+                        if (isStudent && markMaterialAsViewed) {
+                          markMaterialAsViewed(mat.id);
+                        }
+                        addToast(`Downloaded "${mat.title}"`, 'success');
                       }}
-                      className="p-1.5 text-charcoal-muted hover:text-red-600 rounded-lg transition-colors cursor-pointer"
-                      title="Delete Resource"
+                      className="px-3.5 py-1.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{isViewed ? 'Download Again' : 'Download'}</span>
                     </button>
-                  </>
-                )}
-
-                <button
-                  onClick={() => addToast(`Downloaded "${mat.title}"`, 'success')}
-                  className="px-3.5 py-1.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light flex items-center gap-1.5 transition-colors shadow-xs"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download</span>
-                </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Upload Material Modal */}

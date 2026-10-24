@@ -25,8 +25,8 @@ export const HelpModal = () => {
       a: 'When new students register, their account enters "Pending Approval" status. Administrators can review their application details under "Registration Approvals" and approve or reject with one click.'
     },
     {
-      q: 'Can I upload this repository to GitHub and deploy to Vercel?',
-      a: 'Yes! This project is pre-configured with Vite, React 19, Tailwind CSS v4, and Vercel edge configuration. Just push to your GitHub repo and import into Vercel.'
+      q: 'Can I deploy this academy platform online?',
+      a: 'Yes! This web application is built with Vite, React 19, and Tailwind CSS v4, optimized for seamless web hosting and cloud deployment.'
     }
   ];
 

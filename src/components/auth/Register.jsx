@@ -61,13 +61,13 @@ export const Register = () => {
       errors[field] ? 'border-red-500 focus:ring-red-200' : 'border-charcoal/15 focus:ring-forest/30'
     }`;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const found = validate(formData);
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
-    const created = registerStudent(formData);
+    const created = await registerStudent(formData);
     if (created) setRegisteredUser(created);
   };
 
@@ -122,8 +122,7 @@ export const Register = () => {
               </p>
               <button
                 onClick={() => {
-                  switchDemoUser('admin');
-                  setActiveTab('approvals');
+                  switchDemoUser('admin', 'approvals');
                 }}
                 className="mt-3 w-full py-2 px-3 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all text-center"
               >

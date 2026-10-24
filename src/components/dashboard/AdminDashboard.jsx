@@ -25,7 +25,12 @@ export const AdminDashboard = () => {
     rejectUser,
     setActiveTab,
     pendingApprovalsCount,
+    refreshUsers,
   } = useLMS();
+
+  React.useEffect(() => {
+    if (refreshUsers) refreshUsers();
+  }, []);
 
   const totalStudents = users.filter((u) => u.role === 'student' && u.status === 'approved').length;
   const totalTeachers = users.filter((u) => u.role === 'teacher').length;

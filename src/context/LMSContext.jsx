@@ -14,8 +14,11 @@ import {
   INITIAL_REMINDERS,
   INITIAL_MEETINGS,
   INITIAL_COURSE_RATINGS,
+  INITIAL_QUIZZES,
+  INITIAL_QUIZ_SUBMISSIONS,
 } from '../data/mockData';
 import { getDefaultUnitLessons } from '../data/courseCurriculum';
+import { api } from '../services/api';
 
 const LMSContext = createContext(null);
 
@@ -46,6 +49,15 @@ export const LMSProvider = ({ children }) => {
               enrolledCourseIds: init.enrolledCourseIds ?? u.enrolledCourseIds ?? [],
             };
           }
+          if (u.id !== 'usr-1' && u.role === 'student') {
+            return {
+              ...u,
+              points: u.points === 1000 ? 0 : (u.points ?? 0),
+              gpa: u.gpa === '3.80' ? 'N/A' : (u.gpa ?? 'N/A'),
+              streakDays: u.streakDays === 1 ? 0 : (u.streakDays ?? 0),
+              studyHours: u.studyHours === 10 ? 0 : (u.studyHours ?? 0),
+            };
+          }
           return u;
         });
         return [...merged, ...missing];
@@ -59,7 +71,22 @@ export const LMSProvider = ({ children }) => {
   // CHANGED: nobody is logged in by default
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('cacheup_current_user');
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        if (u && u.id !== 'usr-1' && u.role === 'student') {
+          return {
+            ...u,
+            points: u.points === 1000 ? 0 : (u.points ?? 0),
+            gpa: u.gpa === '3.80' ? 'N/A' : (u.gpa ?? 'N/A'),
+            streakDays: u.streakDays === 1 ? 0 : (u.streakDays ?? 0),
+            studyHours: u.studyHours === 10 ? 0 : (u.studyHours ?? 0),
+          };
+        }
+        return u;
+      } catch {}
+    }
+    return null;
   });
 
   const [courses, setCourses] = useState(() => {
@@ -86,8 +113,8 @@ export const LMSProvider = ({ children }) => {
               totalLessons,
               syllabus,
               studentsCount: init.studentsCount,
-              completedLessons: c.completedLessons ?? init.completedLessons,
-              progress: c.progress ?? init.progress,
+              completedLessons: 0,
+              progress: 0,
               customLessons: c.customLessons || {},
             };
           }
@@ -107,7 +134,7 @@ export const LMSProvider = ({ children }) => {
         const parsed = JSON.parse(saved);
         const existingIds = new Set(parsed.map((a) => a.id));
         const missing = INITIAL_ASSIGNMENTS.filter((a) => !existingIds.has(a.id));
-        return [...parsed, ...missing];
+        return [...parsed, ...missing].map((a) => ({ ...a, status: a.status === 'Graded' ? 'Pending' : (a.status || 'Pending') }));
       } catch {
         return INITIAL_ASSIGNMENTS;
       }
@@ -148,6 +175,36 @@ export const LMSProvider = ({ children }) => {
   const [announcements, setAnnouncements] = useState(() => {
     const saved = localStorage.getItem('cacheup_announcements');
     return saved ? JSON.parse(saved) : INITIAL_ANNOUNCEMENTS;
+  });
+
+  const [quizzes, setQuizzes] = useState(() => {
+    const saved = localStorage.getItem('cacheup_quizzes');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const existingIds = new Set(parsed.map((q) => q.id));
+        const missing = INITIAL_QUIZZES.filter((q) => !existingIds.has(q.id));
+        return [...parsed, ...missing];
+      } catch {
+        return INITIAL_QUIZZES;
+      }
+    }
+    return INITIAL_QUIZZES;
+  });
+
+  const [quizSubmissions, setQuizSubmissions] = useState(() => {
+    const saved = localStorage.getItem('cacheup_quiz_submissions');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const existingIds = new Set(parsed.map((s) => s.id));
+        const missing = INITIAL_QUIZ_SUBMISSIONS.filter((s) => !existingIds.has(s.id));
+        return [...parsed, ...missing];
+      } catch {
+        return INITIAL_QUIZ_SUBMISSIONS;
+      }
+    }
+    return INITIAL_QUIZ_SUBMISSIONS;
   });
 
   const [customLessons, setCustomLessons] = useState(() => {
@@ -274,25 +331,122 @@ export const LMSProvider = ({ children }) => {
   const activeTab = rawTab === 'admin' || rawTab === 'teacher' ? 'dashboard' : rawTab;
 
   const [selectedCourseId, setSelectedCourseId] = useState('crs-1');
+  const [courseActiveTab, setCourseActiveTab] = useState('syllabus');
   const [selectedLessonId, setSelectedLessonId] = useState('crs-1-u1-l1');
-  const [viewedLessonIds, setViewedLessonIds] = useState(() => {
-    const saved = localStorage.getItem('cacheup_viewed_lessons');
+  // Initial viewed lessons for demo student Stella (usr-1)
+  const INITIAL_STELLA_VIEWED_LESSONS = [
+    'crs-1-u1-l1',
+    'crs-1-u1-l2',
+    'crs-1-u1-l3',
+    'crs-1-u2-l1',
+    'crs-1-u2-l2',
+    'crs-2-u1-l1',
+    'crs-2-u1-l2',
+    'crs-3-u1-l1',
+    'crs-3-u1-l2',
+    'crs-3-u1-l3',
+    'crs-3-u2-l1',
+    'crs-3-u2-l2',
+    'crs-3-u3-l1',
+    'crs-3-u3-l2',
+    'crs-4-u1-l1',
+    'crs-4-u1-l2',
+    'crs-4-u1-l3',
+    'crs-4-u2-l1',
+    'crs-5-u1-l1',
+    'crs-5-u1-l2',
+    'crs-5-u2-l1',
+    'crs-6-u1-l1',
+    'crs-6-u1-l2',
+    'crs-6-u1-l3',
+    'crs-6-u2-l1',
+  ];
+
+  // User-scoped viewed lessons: { [userId]: string[] }
+  const [userViewedLessons, setUserViewedLessons] = useState(() => {
+    const saved = localStorage.getItem('cacheup_user_viewed_lessons');
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch {
-        // Fallback
-      }
+      } catch {}
     }
-    return [
-      'crs-1-u1-l1',
-      'crs-1-u1-l2',
-      'crs-2-u1-l1',
-      'crs-3-u1-l1',
-      'crs-3-u2-l1',
-      'crs-3-u3-l1',
-    ];
+    const legacy = localStorage.getItem('cacheup_viewed_lessons');
+    let legacyList = null;
+    if (legacy) {
+      try {
+        legacyList = JSON.parse(legacy);
+      } catch {}
+    }
+    return {
+      'usr-1': Array.isArray(legacyList) && legacyList.length > 0 ? legacyList : INITIAL_STELLA_VIEWED_LESSONS,
+    };
   });
+
+  // User-scoped completed courses: { [userId]: string[] }
+  const [userCompletedCourses, setUserCompletedCourses] = useState(() => {
+    const saved = localStorage.getItem('cacheup_user_completed_courses');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    return {
+      'usr-1': ['crs-3'],
+    };
+  });
+
+  // User-scoped viewed materials: { [userId]: string[] }
+  const [userViewedMaterials, setUserViewedMaterials] = useState(() => {
+    const saved = localStorage.getItem('cacheup_user_viewed_materials');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    return {
+      'usr-1': ['mat-1'],
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_user_viewed_lessons', JSON.stringify(userViewedLessons));
+  }, [userViewedLessons]);
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_user_completed_courses', JSON.stringify(userCompletedCourses));
+  }, [userCompletedCourses]);
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_user_viewed_materials', JSON.stringify(userViewedMaterials));
+  }, [userViewedMaterials]);
+
+  const viewedLessonIds = currentUser?.id ? (userViewedLessons[currentUser.id] || []) : [];
+  const viewedMaterialIds = currentUser?.id ? (userViewedMaterials[currentUser.id] || []) : [];
+
+  const markLessonAsViewed = (lessonId) => {
+    if (!lessonId || !currentUser?.id) return;
+    setUserViewedLessons((prev) => {
+      const userList = prev[currentUser.id] || [];
+      if (userList.includes(lessonId)) return prev;
+      return {
+        ...prev,
+        [currentUser.id]: [...userList, lessonId],
+      };
+    });
+  };
+
+  const markMaterialAsViewed = (materialId) => {
+    if (!materialId || !currentUser?.id) return;
+    setUserViewedMaterials((prev) => {
+      const userList = prev[currentUser.id] || [];
+      if (userList.includes(materialId)) return prev;
+      return {
+        ...prev,
+        [currentUser.id]: [...userList, materialId],
+      };
+    });
+  };
+
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('asg-1');
   const [selectedSubmissionId, setSelectedSubmissionId] = useState(null);
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState(null);
@@ -304,19 +458,182 @@ export const LMSProvider = ({ children }) => {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
-  const markLessonAsViewed = (lessonId) => {
-    if (!lessonId) return;
-    setViewedLessonIds((prev) =>
-      prev.includes(lessonId) ? prev : [...prev, lessonId]
-    );
+  // Calculate course progress dynamically for any user
+  const calculateCourseProgress = (
+    course,
+    user = currentUser,
+    lessonViewsMap = userViewedLessons,
+    completedMap = userCompletedCourses
+  ) => {
+    if (!course) return { progress: 0, completedLessons: 0, totalLessons: 0 };
+
+    const syllabus = course.syllabus?.length
+      ? course.syllabus
+      : [{ unit: 'Unit 1', title: 'Core Studio Foundations', lessons: 3 }];
+
+    const courseCustom = customLessons?.[course.id] || course.customLessons || {};
+    const allLessonIds = [];
+    syllabus.forEach((unitObj, unitIdx) => {
+      if (
+        courseCustom[unitIdx] &&
+        Array.isArray(courseCustom[unitIdx]) &&
+        courseCustom[unitIdx].length > 0
+      ) {
+        courseCustom[unitIdx].forEach((les, lIdx) => {
+          allLessonIds.push(les.id || `${course.id}-u${unitIdx + 1}-l${lIdx + 1}`);
+        });
+      } else {
+        const defaultLessons = getDefaultUnitLessons(course, unitIdx);
+        defaultLessons.forEach((l) => allLessonIds.push(l.id));
+      }
+    });
+
+    const totalLessons = allLessonIds.length || course.totalLessons || 1;
+
+    if (!user) {
+      return { progress: 0, completedLessons: 0, totalLessons };
+    }
+
+    const isEnrolled = user.enrolledCourseIds?.includes(course.id);
+    if (!isEnrolled) {
+      return { progress: 0, completedLessons: 0, totalLessons };
+    }
+
+    const userCompleted = user.id ? (completedMap[user.id] || []) : [];
+    if (userCompleted.includes(course.id)) {
+      return { progress: 100, completedLessons: totalLessons, totalLessons };
+    }
+
+    const userViews = user.id ? (lessonViewsMap[user.id] || []) : [];
+    const completedCount = allLessonIds.filter((lid) => userViews.includes(lid)).length;
+
+    if (completedCount === 0) {
+      return { progress: 0, completedLessons: 0, totalLessons };
+    }
+
+    const progress = Math.min(100, Math.round((completedCount / totalLessons) * 100));
+    return { progress, completedLessons: completedCount, totalLessons };
   };
 
-  useEffect(() => {
-    localStorage.setItem(
-      'cacheup_viewed_lessons',
-      JSON.stringify(viewedLessonIds)
+  const getCourseProgress = (courseId, userOverride) => {
+    const user = userOverride !== undefined ? userOverride : currentUser;
+    const course = courses.find((c) => c.id === courseId);
+    if (!course) return 0;
+    const { progress } = calculateCourseProgress(course, user);
+    return progress;
+  };
+
+  const coursesWithUserProgress = React.useMemo(() => {
+    return courses.map((c) => {
+      const { progress, completedLessons, totalLessons } = calculateCourseProgress(
+        c,
+        currentUser,
+        userViewedLessons,
+        userCompletedCourses
+      );
+      return {
+        ...c,
+        totalLessons,
+        completedLessons,
+        progress,
+      };
+    });
+  }, [courses, currentUser, userViewedLessons, userCompletedCourses, customLessons]);
+
+  const isAssignmentDone = (asg, user = currentUser) => {
+    if (!asg) return true;
+    const asgId = asg.id || asg._id;
+    const userId = user?.id || user?._id;
+    return (submissions || []).some((s) => {
+      const subAsgId = s?.assignmentId?._id || s?.assignmentId?.id || s?.assignmentId;
+      const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+      return (
+        (String(subAsgId) === String(asgId) || String(subAsgId) === String(asg.id) || String(subAsgId) === String(asg._id)) &&
+        String(subStudentId) === String(userId)
+      );
+    });
+  };
+
+  const isQuizDone = (quiz, user = currentUser) => {
+    if (!quiz) return true;
+    const quizId = quiz.id || quiz._id;
+    const userId = user?.id || user?._id;
+    return (quizSubmissions || []).some((s) => {
+      const subQuizId = s?.quizId?._id || s?.quizId?.id || s?.quizId;
+      const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+      return (
+        (String(subQuizId) === String(quizId) || String(subQuizId) === String(quiz.id) || String(subQuizId) === String(quiz._id)) &&
+        String(subStudentId) === String(userId)
+      );
+    });
+  };
+
+  const isUnitCompleted = (course, unitIdx, user = currentUser) => {
+    if (!course) return false;
+    const targetUnitIdx = Number(unitIdx);
+
+    // 1. Lessons in this unit
+    const courseCustom = customLessons?.[course.id] || course.customLessons || {};
+    let unitLessons = [];
+    if (
+      courseCustom[targetUnitIdx] &&
+      Array.isArray(courseCustom[targetUnitIdx]) &&
+      courseCustom[targetUnitIdx].length > 0
+    ) {
+      unitLessons = courseCustom[targetUnitIdx];
+    } else {
+      unitLessons = getDefaultUnitLessons(course, targetUnitIdx);
+    }
+    const userViewed = user?.id ? (userViewedLessons[user.id] || []) : [];
+    const allLessonsViewed = unitLessons.every((l) => userViewed.includes(l.id));
+
+    // 2. Materials in this unit
+    const courseMats = (materials || []).filter((m) => m.courseId === course.id);
+    const unitMats = courseMats.filter((m, mIdx) => {
+      if (m.unitIdx !== undefined && m.unitIdx !== null) {
+        return Number(m.unitIdx) === targetUnitIdx;
+      }
+      return mIdx % (course.syllabus?.length || 1) === targetUnitIdx;
+    });
+    const userMats = user?.id ? (userViewedMaterials[user.id] || []) : [];
+    const allMaterialsViewed = unitMats.every((m) => userMats.includes(m.id));
+
+    // 3. Assignments in this unit
+    const courseAsgs = (assignments || []).filter((a) => a.courseId === course.id);
+    const unitAsgs = courseAsgs.filter((a, aIdx) => {
+      if (a.unitIdx !== undefined && a.unitIdx !== null) {
+        return Number(a.unitIdx) === targetUnitIdx;
+      }
+      return aIdx % (course.syllabus?.length || 1) === targetUnitIdx;
+    });
+    const allAssignmentsDone = unitAsgs.every((a) => isAssignmentDone(a, user));
+
+    // 4. Quizzes in this unit
+    const courseQzs = (quizzes || []).filter(
+      (q) =>
+        q.courseId === course.id &&
+        (q.unitIdx !== undefined
+          ? Number(q.unitIdx) === targetUnitIdx
+          : targetUnitIdx === 0)
     );
-  }, [viewedLessonIds]);
+    const allQuizzesDone = courseQzs.every((q) => isQuizDone(q, user));
+
+    return allLessonsViewed && allMaterialsViewed && allAssignmentsDone && allQuizzesDone;
+  };
+
+  const isUnitUnlocked = (course, unitIdx, user = currentUser) => {
+    if (!user || user.role !== 'student') return true;
+    if (!course) return false;
+    const targetUnitIdx = Number(unitIdx);
+    if (targetUnitIdx <= 0) return true;
+
+    for (let i = 0; i < targetUnitIdx; i++) {
+      if (!isUnitCompleted(course, i, user)) {
+        return false;
+      }
+    }
+    return true;
+  };
 
   const setActiveTab = (tab, userOverride) => {
     const targetUser = userOverride !== undefined ? userOverride : currentUser;
@@ -371,12 +688,95 @@ export const LMSProvider = ({ children }) => {
   }, [announcements]);
 
   useEffect(() => {
+    localStorage.setItem('cacheup_quizzes', JSON.stringify(quizzes));
+  }, [quizzes]);
+
+  useEffect(() => {
+    localStorage.setItem('cacheup_quiz_submissions', JSON.stringify(quizSubmissions));
+  }, [quizSubmissions]);
+
+  useEffect(() => {
     localStorage.setItem('cacheup_schedule', JSON.stringify(schedule));
   }, [schedule]);
 
   useEffect(() => {
     localStorage.setItem('cacheup_custom_lessons', JSON.stringify(customLessons));
   }, [customLessons]);
+
+  // Synchronize state with backend database on startup
+  useEffect(() => {
+    let isMounted = true;
+    const syncDatabase = async () => {
+      try {
+        const isHealthy = await api.checkHealth();
+        if (!isHealthy || !isMounted) return;
+
+        const [
+          resUsers,
+          resCourses,
+          resAssignments,
+          resSubmissions,
+          resQuizzes,
+          resQuizSubs,
+          resMaterials,
+          resAnnouncements,
+          resSchedules,
+        ] = await Promise.allSettled([
+          api.users.getAll(),
+          api.courses.getAll(),
+          api.assignments.getAll(),
+          api.submissions.getAll(),
+          api.quizzes.getAll(),
+          api.quizzes.getSubmissions(),
+          api.materials.getAll(),
+          api.announcements.getAll(),
+          api.schedules.getAll(),
+        ]);
+
+        if (isMounted) {
+          if (resUsers.status === 'fulfilled' && Array.isArray(resUsers.value) && resUsers.value.length > 0) {
+            setUsers(resUsers.value.map(u => ({
+              ...u,
+              password: u.password || 'password123',
+              points: u.id === 'usr-1' ? u.points : (u.points === 1000 ? 0 : (u.points ?? 0)),
+              gpa: u.id === 'usr-1' ? u.gpa : (u.gpa === '3.80' ? 'N/A' : (u.gpa ?? 'N/A')),
+              streakDays: u.id === 'usr-1' ? u.streakDays : (u.streakDays === 1 ? 0 : (u.streakDays ?? 0)),
+              studyHours: u.id === 'usr-1' ? u.studyHours : (u.studyHours === 10 ? 0 : (u.studyHours ?? 0)),
+            })));
+          }
+          if (resCourses.status === 'fulfilled' && Array.isArray(resCourses.value) && resCourses.value.length > 0) {
+            setCourses(resCourses.value);
+          }
+          if (resAssignments.status === 'fulfilled' && Array.isArray(resAssignments.value)) {
+            setAssignments(resAssignments.value);
+          }
+          if (resSubmissions.status === 'fulfilled' && Array.isArray(resSubmissions.value)) {
+            setSubmissions(resSubmissions.value);
+          }
+          if (resQuizzes.status === 'fulfilled' && Array.isArray(resQuizzes.value)) {
+            setQuizzes(resQuizzes.value);
+          }
+          if (resQuizSubs.status === 'fulfilled' && Array.isArray(resQuizSubs.value)) {
+            setQuizSubmissions(resQuizSubs.value);
+          }
+          if (resMaterials.status === 'fulfilled' && Array.isArray(resMaterials.value)) {
+            setMaterials(resMaterials.value);
+          }
+          if (resAnnouncements.status === 'fulfilled' && Array.isArray(resAnnouncements.value)) {
+            setAnnouncements(resAnnouncements.value);
+          }
+          if (resSchedules.status === 'fulfilled' && typeof resSchedules.value === 'object' && resSchedules.value !== null) {
+            setUserSchedules(resSchedules.value);
+          }
+        }
+      } catch (err) {
+        console.warn('Backend sync failed, using cached/mock local state:', err);
+      }
+    };
+
+    syncDatabase();
+    return () => { isMounted = false; };
+  }, []);
 
   // Toast Notification helper
   const addToast = (message, type = 'success') => {
@@ -392,15 +792,47 @@ export const LMSProvider = ({ children }) => {
   };
 
   // Authentication actions
-  const login = (email, password) => {
+  const login = async (email, password) => {
+    const cleanEmail = email.toLowerCase().trim();
+    try {
+      const res = await api.auth.login(cleanEmail, password);
+      if (res && res.user) {
+        const loggedUser = {
+          ...res.user,
+          id: res.user.id || res.user._id,
+          points: res.user.id === 'usr-1' ? res.user.points : (res.user.points === 1000 ? 0 : (res.user.points ?? 0)),
+          gpa: res.user.id === 'usr-1' ? res.user.gpa : (res.user.gpa === '3.80' ? 'N/A' : (res.user.gpa ?? 'N/A')),
+          streakDays: res.user.id === 'usr-1' ? res.user.streakDays : (res.user.streakDays === 1 ? 0 : (res.user.streakDays ?? 0)),
+          studyHours: res.user.id === 'usr-1' ? res.user.studyHours : (res.user.studyHours === 10 ? 0 : (res.user.studyHours ?? 0)),
+        };
+        setCurrentUser(loggedUser);
+        setActiveTab('dashboard', loggedUser);
+        const teacherFirstName = loggedUser.name.replace(/^Prof\.\s*/i, '').trim().split(' ')[0];
+        addToast(
+          loggedUser.role === 'teacher'
+            ? `Hello Prof. ${teacherFirstName}!`
+            : `Welcome back, ${loggedUser.name}!`,
+          'success'
+        );
+        return true;
+      }
+    } catch (err) {
+      if (err.data && err.data.message) {
+        addToast(err.data.message, err.status === 403 ? 'warning' : 'error');
+        return false;
+      }
+    }
+
+    // Local fallback if server unreachable
     const found = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase().trim()
+      (u) => u.email.toLowerCase() === cleanEmail
     );
     if (!found) {
       addToast('No user found with this email address.', 'error');
       return false;
     }
-    if (found.password !== password) {
+    const expectedPassword = found.password || 'password123';
+    if (expectedPassword !== password) {
       addToast('Invalid password. Please check your credentials.', 'error');
       return false;
     }
@@ -431,7 +863,7 @@ export const LMSProvider = ({ children }) => {
   };
 
   // Switch demo persona instantly
-  const switchDemoUser = (role) => {
+  const switchDemoUser = (role, targetTab = "dashboard") => {
     let target;
     if (role === 'student') {
       target = users.find((u) => u.id === 'usr-1') || users.find((u) => u.role === 'student' && u.status === 'approved');
@@ -442,7 +874,7 @@ export const LMSProvider = ({ children }) => {
     }
     if (target) {
       setCurrentUser(target);
-      setActiveTab('dashboard', target);
+      setActiveTab(targetTab, target);
       addToast(`Switched active persona to ${target.name} (${target.role.toUpperCase()})`, 'info');
     }
   };
@@ -456,13 +888,57 @@ export const LMSProvider = ({ children }) => {
     }
   };
 
-  // Student Registration
-  const registerStudent = (formData) => {
+  // Student Registration (synchronized with backend database)
+  const registerStudent = async (formData) => {
     const email = formData.email.trim().toLowerCase();
+
+    try {
+      const res = await api.auth.register({
+        name: formData.name.trim(),
+        email,
+        password: formData.password,
+        department: formData.department,
+        phone: formData.phone,
+        bio: formData.bio,
+        notes: formData.notes,
+      });
+
+      if (res && res.user) {
+        const newUser = {
+          ...res.user,
+          id: res.user.id || res.user._id,
+          password: formData.password || 'password123',
+          points: res.user.points && res.user.points !== 1000 ? res.user.points : 0,
+          gpa: res.user.gpa && res.user.gpa !== '3.80' ? res.user.gpa : 'N/A',
+          streakDays: res.user.streakDays && res.user.streakDays !== 1 ? res.user.streakDays : 0,
+          studyHours: res.user.studyHours && res.user.studyHours !== 10 ? res.user.studyHours : 0,
+          enrolledCourseIds: res.user.enrolledCourseIds || [],
+        };
+        setUsers((prev) => [newUser, ...prev.filter((u) => u.id !== newUser.id && u.email?.toLowerCase() !== email)]);
+        addToast('Registration submitted! An administrator will review and approve your account.', 'success');
+        return newUser;
+      }
+    } catch (err) {
+      console.warn('Backend register error:', err);
+      if (err.data && err.data.message) {
+        addToast(err.data.message, 'error');
+        return null;
+      }
+      if (err.message && err.message.includes('fetch')) {
+        console.warn('Backend server offline, falling back to local registration.');
+      } else {
+        addToast(err.message || 'Registration failed. Please check your details.', 'error');
+        return null;
+      }
+    }
+
+    // Offline local fallback if backend is unreachable
     if (users.some((u) => u.email.toLowerCase() === email)) {
       addToast('An account with this email already exists.', 'error');
       return null;
     }
+
+    // Local fallback if backend is unreachable
     const newUser = {
       id: `usr-${Date.now()}`,
       name: formData.name.trim(),
@@ -481,7 +957,7 @@ export const LMSProvider = ({ children }) => {
       enrolledCourseIds: [],
       points: 0,
       gpa: 'N/A',
-      streakDays: 1,
+      streakDays: 0,
       studyHours: 0,
     };
 
@@ -490,45 +966,59 @@ export const LMSProvider = ({ children }) => {
     return newUser;
   };
 
-  // Admin user approvals
+  // Admin user approvals (persisted to backend database)
   const approveUser = (userId) => {
+    api.users.updateStatus(userId, 'approved').catch((e) => console.warn(e));
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, status: 'approved', title: 'Enrolled Student' } : u))
+      prev.map((u) =>
+        u.id === userId || u._id === userId
+          ? { ...u, status: 'approved', title: 'Enrolled Student' }
+          : u
+      )
     );
     addToast('Student registration approved! Student can now log in.', 'success');
   };
 
   const rejectUser = (userId, reason) => {
+    api.users.updateStatus(userId, 'rejected').catch((e) => console.warn(e));
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, status: 'rejected', rejectionReason: reason || 'Application criteria incomplete' } : u))
+      prev.map((u) =>
+        u.id === userId || u._id === userId
+          ? { ...u, status: 'rejected', rejectionReason: reason || 'Application criteria incomplete' }
+          : u
+      )
     );
     addToast('Student registration rejected.', 'warning');
   };
 
   const updateUserRole = (userId, newRole) => {
+    api.users.updateProfile(userId, { role: newRole }).catch((e) => console.warn(e));
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
+      prev.map((u) => (u.id === userId || u._id === userId ? { ...u, role: newRole } : u))
     );
-    if (currentUser?.id === userId) {
+    if (currentUser?.id === userId || currentUser?._id === userId) {
       setCurrentUser((prev) => ({ ...prev, role: newRole }));
     }
-    addToast('User role updated successfully.', 'success');
+    addToast(`User role updated to ${newRole}.`, 'success');
   };
 
   const deleteUser = (userId) => {
-    if (currentUser?.id === userId) {
+    if (currentUser?.id === userId || currentUser?._id === userId) {
       addToast('Cannot delete the currently logged in user!', 'error');
       return;
     }
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    api.users.delete(userId).catch((e) => console.warn(e));
+    setUsers((prev) => prev.filter((u) => u.id !== userId && u._id !== userId));
     addToast('User removed from system.', 'info');
   };
 
   const updateProfile = (updatedFields, message = 'Profile updated successfully!') => {
     if (!currentUser) return;
+    const currentId = currentUser.id || currentUser._id;
+    api.users.updateProfile(currentId, updatedFields).catch((e) => console.warn(e));
     const updated = { ...currentUser, ...updatedFields };
     setCurrentUser(updated);
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
+    setUsers((prev) => prev.map((u) => (u.id === currentId || u._id === currentId ? updated : u)));
     addToast(message, 'success');
   };
 
@@ -561,12 +1051,14 @@ export const LMSProvider = ({ children }) => {
         { unit: 'Unit 3', title: 'Capstone Project & Final Assessment', lessons: 6 }
       ]
     };
+    api.courses.create(newCourse).catch((e) => console.warn(e));
     setCourses((prev) => [newCourse, ...prev]);
     addToast(`Course "${newCourse.title}" created successfully!`, 'success');
     return newCourse;
   };
 
   const updateCourse = (courseId, courseData) => {
+    api.courses.update(courseId, courseData).catch((e) => console.warn(e));
     setCourses((prev) =>
       prev.map((c) => (c.id === courseId ? { ...c, ...courseData } : c))
     );
@@ -574,6 +1066,7 @@ export const LMSProvider = ({ children }) => {
   };
 
   const deleteCourse = (courseId) => {
+    api.courses.delete(courseId).catch((e) => console.warn(e));
     setCourses((prev) => prev.filter((c) => c.id !== courseId));
     addToast('Course deleted.', 'info');
   };
@@ -896,15 +1389,52 @@ export const LMSProvider = ({ children }) => {
     const isEnrolled = currentUser.enrolledCourseIds?.includes(courseId);
     let updatedIds;
     if (isEnrolled) {
-      updatedIds = currentUser.enrolledCourseIds.filter((id) => id !== courseId);
+      updatedIds = (currentUser.enrolledCourseIds || []).filter((id) => id !== courseId);
       addToast('Unenrolled from course.', 'info');
     } else {
       updatedIds = [...(currentUser.enrolledCourseIds || []), courseId];
+      // Reset any viewed lessons, viewed materials, and completion for this course so the student starts fresh at 0% progress
+      const currentUserId = currentUser.id || currentUser._id;
+      if (currentUserId) {
+        setUserViewedLessons((prev) => {
+          const userList = prev[currentUserId] || [];
+          const cleaned = userList.filter((lid) => !lid.startsWith(`${courseId}-`));
+          return { ...prev, [currentUserId]: cleaned };
+        });
+        setUserViewedMaterials((prev) => {
+          const userList = prev[currentUserId] || [];
+          const courseMatIds = materials.filter((m) => m.courseId === courseId).map((m) => m.id);
+          const cleaned = userList.filter((mid) => !courseMatIds.includes(mid));
+          return { ...prev, [currentUserId]: cleaned };
+        });
+        setUserCompletedCourses((prev) => {
+          const userList = prev[currentUserId] || [];
+          const cleaned = userList.filter((id) => id !== courseId);
+          return { ...prev, [currentUserId]: cleaned };
+        });
+      }
       addToast('Successfully enrolled! Welcome to the course.', 'success');
     }
+
     const updatedUser = { ...currentUser, enrolledCourseIds: updatedIds };
     setCurrentUser(updatedUser);
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updatedUser : u)));
+
+    setUsers((prev) =>
+      prev.map((u) => {
+        const isMatch =
+          (u.id && (u.id === currentUser.id || u.id === currentUser._id)) ||
+          (u._id && (u._id === currentUser.id || u._id === currentUser._id)) ||
+          (u.email && currentUser.email && u.email.toLowerCase() === currentUser.email.toLowerCase());
+        return isMatch ? { ...u, enrolledCourseIds: updatedIds } : u;
+      })
+    );
+
+    const targetUserId = currentUser.id || currentUser._id;
+    if (targetUserId) {
+      api.users.updateProfile(targetUserId, { enrolledCourseIds: updatedIds }).catch((e) => {
+        console.warn('Backend enrollment sync warning:', e);
+      });
+    }
   };
 
   // Assignment actions
@@ -931,6 +1461,7 @@ export const LMSProvider = ({ children }) => {
       rubric: data.rubric || [{ criteria: 'Standard Execution & Quality', points: 100 }],
       submissionTypes: data.submissionTypes || ['pdf', 'link']
     };
+    api.assignments.create(newAsg).catch((e) => console.warn(e));
     setAssignments((prev) => [...prev, newAsg]);
     addToast(`Assignment "${newAsg.title}" published!`, 'success');
     return newAsg;
@@ -962,6 +1493,7 @@ export const LMSProvider = ({ children }) => {
   };
 
   const deleteAssignment = (id) => {
+    api.assignments.delete(id).catch((e) => console.warn(e));
     setAssignments((prev) => prev.filter((a) => a.id !== id));
     setSubmissions((prev) => prev.filter((s) => s.assignmentId !== id));
     addToast('Assignment removed.', 'info');
@@ -1047,28 +1579,34 @@ export const LMSProvider = ({ children }) => {
       assignmentId: data.assignmentId,
       assignmentTitle: assignment ? assignment.title : 'Assignment',
       courseId: assignment ? assignment.courseId : 'crs-1',
-      studentId: currentUser.id,
-      studentName: currentUser.name,
-      studentAvatar: currentUser.avatar,
+      courseName: assignment?.courseName || 'Course',
+      studentId: currentUser?.id || 'usr-1',
+      studentName: currentUser?.name || 'Student',
+      studentAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
       submissionDate: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      submissionType: data.submissionType || (data.linkUrl ? 'link' : data.fileName ? 'file' : 'text'),
       content: data.content || '',
       linkUrl: data.linkUrl || '',
-      fileName: data.fileName || 'Assignment_Submission.pdf',
-      fileSize: data.fileSize || '2.8 MB',
+      fileName: data.fileName || (data.submissionType === 'file' ? 'Assignment_Submission.pdf' : ''),
+      fileSize: data.fileSize || (data.submissionType === 'file' ? '2.8 MB' : ''),
+      fileUrl: data.fileUrl || '',
       status: 'Submitted',
       score: null,
       maxScore: assignment?.maxScore || 100,
       feedback: '',
+      rubricScores: null,
       gradedBy: null,
       gradedAt: null
     };
 
+    api.submissions.submit(newSub).catch((e) => console.warn(e));
     setSubmissions((prev) => [newSub, ...prev]);
     addToast('Assignment submitted successfully! Great work.', 'success');
     return newSub;
   };
 
-  const gradeSubmission = (subId, score, feedback) => {
+  const gradeSubmission = (subId, score, feedback, rubricScores = null) => {
+    api.submissions.grade(subId, { score, feedback, rubricScores, gradedBy: currentUser?.name || 'Instructor' }).catch((e) => console.warn(e));
     setSubmissions((prev) =>
       prev.map((s) => {
         if (s.id === subId) {
@@ -1076,6 +1614,7 @@ export const LMSProvider = ({ children }) => {
             ...s,
             score: parseInt(score),
             feedback,
+            rubricScores: rubricScores !== null ? rubricScores : s.rubricScores,
             status: 'Graded',
             gradedBy: currentUser?.name || 'Prof. Alicia Mayer',
             gradedAt: new Date().toISOString().replace('T', ' ').slice(0, 16)
@@ -1085,6 +1624,114 @@ export const LMSProvider = ({ children }) => {
       })
     );
     addToast('Grade and constructive feedback recorded!', 'success');
+  };
+
+  // Multiple Choice Quiz actions
+  const addQuiz = (data) => {
+    const course = courses.find((c) => c.id === data.courseId);
+    const questions = data.questions || [];
+    const totalPoints = questions.reduce((acc, q) => acc + (Number(q.points) || 10), 0);
+    const newQuiz = {
+      id: `quiz-${Date.now()}`,
+      courseId: data.courseId,
+      courseName: course ? course.title : (data.courseName || 'Course Assessment'),
+      unitIdx: data.unitIdx !== undefined && data.unitIdx !== '' ? Number(data.unitIdx) : 0,
+      title: data.title || 'Multiple Choice Quiz',
+      description: data.description || 'Answer the following multiple choice questions.',
+      dueDate: data.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+      dueTime: data.dueTime || '11:59 PM',
+      duration: data.duration || (data.timeLimitMinutes ? `${data.timeLimitMinutes} minutes` : '20 minutes'),
+      timeLimitMinutes: Number(data.timeLimitMinutes) || 20,
+      passingScorePercent: Number(data.passingScorePercent) || 70,
+      totalPoints: totalPoints || Number(data.totalPoints) || 40,
+      status: 'Active',
+      publishedAt: new Date().toISOString().slice(0, 10),
+      questions: questions.length > 0 ? questions : [
+        {
+          id: `q-${Date.now()}-1`,
+          prompt: 'Enter your multiple choice question here...',
+          points: 10,
+          options: ['Option A', 'Option B', 'Option C', 'Option D'],
+          correctOptionIndex: 0,
+          explanation: 'Explanation for correct choice.'
+        }
+      ]
+    };
+
+    api.quizzes.create(newQuiz).catch((e) => console.warn(e));
+    setQuizzes((prev) => [...prev, newQuiz]);
+    addToast(`Quiz "${newQuiz.title}" created successfully!`, 'success');
+    return newQuiz;
+  };
+
+  const updateQuiz = (id, data) => {
+    setQuizzes((prev) =>
+      prev.map((q) => {
+        if (q.id !== id) return q;
+        const course = data.courseId ? courses.find((c) => c.id === data.courseId) : null;
+        const questions = data.questions !== undefined ? data.questions : q.questions;
+        const totalPoints = questions.reduce((acc, item) => acc + (Number(item.points) || 10), 0);
+        return {
+          ...q,
+          ...data,
+          courseName: course ? course.title : q.courseName,
+          questions,
+          totalPoints: totalPoints || data.totalPoints || q.totalPoints,
+          unitIdx: data.unitIdx !== undefined ? Number(data.unitIdx) : q.unitIdx
+        };
+      })
+    );
+    addToast('Quiz updated successfully.', 'success');
+  };
+
+  const deleteQuiz = (id) => {
+    api.quizzes.delete(id).catch((e) => console.warn(e));
+    setQuizzes((prev) => prev.filter((q) => q.id !== id));
+    setQuizSubmissions((prev) => prev.filter((s) => s.quizId !== id));
+    addToast('Quiz removed.', 'info');
+  };
+
+  const submitQuiz = (data) => {
+    const quiz = quizzes.find((q) => q.id === data.quizId);
+    let earnedScore = 0;
+    const maxScore = quiz?.totalPoints || 100;
+
+    if (quiz && quiz.questions) {
+      quiz.questions.forEach((q) => {
+        const studentChoice = data.answers?.[q.id];
+        if (studentChoice !== undefined && studentChoice === q.correctOptionIndex) {
+          earnedScore += Number(q.points) || 10;
+        }
+      });
+    } else {
+      earnedScore = data.score || 0;
+    }
+
+    const percentage = maxScore > 0 ? Math.round((earnedScore / maxScore) * 100) : 100;
+    const passed = percentage >= (quiz?.passingScorePercent || 70);
+
+    const newSub = {
+      id: `qsub-${Date.now()}`,
+      quizId: data.quizId,
+      quizTitle: quiz ? quiz.title : 'Quiz Assessment',
+      courseId: quiz ? quiz.courseId : 'crs-1',
+      courseName: quiz ? quiz.courseName : 'Course',
+      studentId: currentUser?.id || 'usr-1',
+      studentName: currentUser?.name || 'Student',
+      studentAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      submittedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      answers: data.answers || {},
+      score: earnedScore,
+      maxScore,
+      percentage,
+      passed,
+      timeSpent: data.timeSpent || 'Completed'
+    };
+
+    api.quizzes.submit(newSub).catch((e) => console.warn(e));
+    setQuizSubmissions((prev) => [newSub, ...prev]);
+    addToast(`Quiz submitted! Your score: ${earnedScore}/${maxScore} (${percentage}%)`, passed ? 'success' : 'info');
+    return newSub;
   };
 
   // Learning Materials actions
@@ -1106,12 +1753,14 @@ export const LMSProvider = ({ children }) => {
           ? Number(data.unitIdx)
           : undefined,
     };
+    api.materials.create(newMat).catch((e) => console.warn(e));
     setMaterials((prev) => [newMat, ...prev]);
     addToast(`Material "${newMat.title}" added to course resources!`, 'success');
     return newMat;
   };
 
   const deleteMaterial = (id) => {
+    api.materials.delete(id).catch((e) => console.warn(e));
     setMaterials((prev) => prev.filter((m) => m.id !== id));
     addToast('Learning material removed.', 'info');
   };
@@ -1221,6 +1870,7 @@ export const LMSProvider = ({ children }) => {
       isRead: false,
       content: data.content
     };
+    api.announcements.create(newAnc).catch((e) => console.warn(e));
     setAnnouncements((prev) => [newAnc, ...prev]);
     addToast('Announcement broadcasted to students and staff!', 'success');
   };
@@ -1232,6 +1882,7 @@ export const LMSProvider = ({ children }) => {
   };
 
   const deleteAnnouncement = (id) => {
+    api.announcements.delete(id).catch((e) => console.warn(e));
     setAnnouncements((prev) => prev.filter((a) => a.id !== id));
     addToast('Announcement deleted.', 'info');
   };
@@ -1411,7 +2062,16 @@ export const LMSProvider = ({ children }) => {
       };
     });
 
-    // Also update course progress to 100% and recalculate average rating
+    // Mark course as completed for this student
+    if (student.id) {
+      setUserCompletedCourses((prev) => {
+        const userList = prev[student.id] || [];
+        if (userList.includes(courseId)) return prev;
+        return { ...prev, [student.id]: [...userList, courseId] };
+      });
+    }
+
+    // Recalculate average rating on course
     setCourses((prevCourses) =>
       prevCourses.map((c) => {
         if (c.id === courseId) {
@@ -1425,8 +2085,6 @@ export const LMSProvider = ({ children }) => {
           return {
             ...c,
             rating: parseFloat(avg),
-            progress: 100,
-            completedLessons: c.totalLessons,
           };
         }
         return c;
@@ -1451,13 +2109,40 @@ export const LMSProvider = ({ children }) => {
   };
 
   const markCourseComplete = (courseId) => {
-    setCourses((prev) =>
-      prev.map((c) =>
-        c.id === courseId
-          ? { ...c, progress: 100, completedLessons: c.totalLessons }
-          : c
-      )
-    );
+    if (!currentUser?.id) return;
+    setUserCompletedCourses((prev) => {
+      const userList = prev[currentUser.id] || [];
+      if (userList.includes(courseId)) return prev;
+      return { ...prev, [currentUser.id]: [...userList, courseId] };
+    });
+
+    const course = courses.find((c) => c.id === courseId);
+    if (course) {
+      const syllabus = course.syllabus?.length
+        ? course.syllabus
+        : [{ unit: 'Unit 1', title: 'Core Studio Foundations', lessons: 3 }];
+      const courseCustom = customLessons?.[course.id] || course.customLessons || {};
+      const allLessonIds = [];
+      syllabus.forEach((unitObj, unitIdx) => {
+        if (
+          courseCustom[unitIdx] &&
+          Array.isArray(courseCustom[unitIdx]) &&
+          courseCustom[unitIdx].length > 0
+        ) {
+          courseCustom[unitIdx].forEach((les, lIdx) => {
+            allLessonIds.push(les.id || `${course.id}-u${unitIdx + 1}-l${lIdx + 1}`);
+          });
+        } else {
+          const defaultLessons = getDefaultUnitLessons(course, unitIdx);
+          defaultLessons.forEach((l) => allLessonIds.push(l.id));
+        }
+      });
+      setUserViewedLessons((prev) => {
+        const userList = prev[currentUser.id] || [];
+        const set = new Set([...userList, ...allLessonIds]);
+        return { ...prev, [currentUser.id]: Array.from(set) };
+      });
+    }
     addToast('🎉 Congratulations! Course marked as completed. You can now rate it!', 'success');
   };
 
@@ -1467,8 +2152,13 @@ export const LMSProvider = ({ children }) => {
     setUsers(INITIAL_USERS);
     setCurrentUser(INITIAL_USERS[0]);
     setCourses(INITIAL_COURSES);
+    setUserViewedLessons({ 'usr-1': INITIAL_STELLA_VIEWED_LESSONS });
+    setUserCompletedCourses({ 'usr-1': ['crs-3'] });
+    setUserViewedMaterials({ 'usr-1': ['mat-1'] });
     setAssignments(INITIAL_ASSIGNMENTS);
     setSubmissions(INITIAL_SUBMISSIONS);
+    setQuizzes(INITIAL_QUIZZES);
+    setQuizSubmissions(INITIAL_QUIZ_SUBMISSIONS);
     setMaterials(INITIAL_MATERIALS);
     setAnnouncements(INITIAL_ANNOUNCEMENTS);
     setUserSchedules(INITIAL_USER_SCHEDULES);
@@ -1478,6 +2168,18 @@ export const LMSProvider = ({ children }) => {
     setCustomLessons({});
     setActiveTab('dashboard');
     addToast('System reset to original fresh demo state!', 'info');
+  };
+
+  // Refresh users from database
+  const refreshUsers = async () => {
+    try {
+      const data = await api.users.getAll();
+      if (Array.isArray(data) && data.length > 0) {
+        setUsers(data.map((u) => ({ ...u, password: u.password || 'password123' })));
+      }
+    } catch (err) {
+      console.warn('refreshUsers error:', err);
+    }
   };
 
   // Helper counts
@@ -1512,10 +2214,14 @@ export const LMSProvider = ({ children }) => {
         updateProfile,
 
         // Data
-        courses,
+        courses: coursesWithUserProgress,
+        rawCourses: courses,
+        getCourseProgress,
         customLessons,
         assignments,
         submissions,
+        quizzes,
+        quizSubmissions,
         materials,
         announcements,
         schedule,
@@ -1553,6 +2259,12 @@ export const LMSProvider = ({ children }) => {
         submitAssignment,
         gradeSubmission,
 
+        // Quiz management
+        addQuiz,
+        updateQuiz,
+        deleteQuiz,
+        submitQuiz,
+
         // Materials, Announcements & Schedule
         addMaterial,
         updateMaterial,
@@ -1577,6 +2289,12 @@ export const LMSProvider = ({ children }) => {
         setSelectedLessonId,
         viewedLessonIds,
         markLessonAsViewed,
+        viewedMaterialIds,
+        markMaterialAsViewed,
+        isUnitCompleted,
+        isUnitUnlocked,
+        isAssignmentDone,
+        isQuizDone,
         selectedAssignmentId,
         setSelectedAssignmentId,
         selectedSubmissionId,
@@ -1603,7 +2321,8 @@ export const LMSProvider = ({ children }) => {
         resetDemoData,
         pendingApprovalsCount,
         pendingGradingCount,
-        unreadAnnouncementsCount
+        unreadAnnouncementsCount,
+        refreshUsers
       }}
     >
       {children}

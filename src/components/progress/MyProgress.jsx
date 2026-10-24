@@ -89,35 +89,45 @@ export const MyProgress = () => {
         </h3>
 
         <div className="space-y-4">
-          {enrolledCourses.map((c) => (
-            <div key={c.id} className="p-4 rounded-2xl bg-cream/40 border border-charcoal/10">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-forest">
-                    {c.code}
-                  </span>
-                  <h4 className="text-sm font-bold text-charcoal">{c.title}</h4>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-forest">
-                    {c.completedLessons || 0} /{' '}
-                    {c.syllabus?.reduce((acc, u) => acc + (u.lessons || 0), 0) || c.totalLessons || 6}{' '}
-                    Lessons
-                  </span>
-                  <span className="text-xs font-extrabold text-charcoal ml-2">
-                    ({c.progress}%)
-                  </span>
-                </div>
-              </div>
-
-              <div className="w-full h-3 rounded-full bg-charcoal/10 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-forest transition-all duration-700"
-                  style={{ width: `${c.progress}%` }}
-                />
-              </div>
+          {enrolledCourses.length === 0 ? (
+            <div className="p-8 text-center bg-cream/30 rounded-2xl border border-dashed border-charcoal/20">
+              <BookOpen className="w-8 h-8 text-charcoal/30 mx-auto mb-2" />
+              <p className="text-xs font-bold text-charcoal">No enrolled courses yet</p>
+              <p className="text-[11px] text-charcoal-muted mt-0.5">
+                Explore the Course Catalog to enroll and start tracking your academic progress.
+              </p>
             </div>
-          ))}
+          ) : (
+            enrolledCourses.map((c) => (
+              <div key={c.id} className="p-4 rounded-2xl bg-cream/40 border border-charcoal/10">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-forest">
+                      {c.code}
+                    </span>
+                    <h4 className="text-sm font-bold text-charcoal">{c.title}</h4>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-forest">
+                      {c.completedLessons || 0} /{' '}
+                      {c.totalLessons || c.syllabus?.reduce((acc, u) => acc + (u.lessons || 0), 0) || 6}{' '}
+                      Lessons
+                    </span>
+                    <span className="text-xs font-extrabold text-charcoal ml-2">
+                      ({c.progress || 0}%)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="w-full h-3 rounded-full bg-charcoal/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-forest transition-all duration-700"
+                    style={{ width: `${c.progress || 0}%` }}
+                  />
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

@@ -8,13 +8,14 @@ export const Login = () => {
   const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      login(email, password);
+    try {
+      await login(email, password);
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
   const handleQuickDemo = (role) => {
@@ -142,12 +143,12 @@ export const Login = () => {
           </div>
         </div>
 
-        {/* Register CTA — CHANGED: new wording */}
+        {/* Register CTA */}
         <div className="mt-6 text-center text-xs text-charcoal-muted">
           Don&apos;t have an account?{' '}
           <button
             onClick={() => setActiveTab('register')}
-            className="font-bold text-forest hover:text-gold transition-colors underline"
+            className="font-bold text-forest hover:text-gold transition-colors underline cursor-pointer"
           >
             Sign up
           </button>

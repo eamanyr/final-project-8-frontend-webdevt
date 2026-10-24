@@ -343,12 +343,19 @@ export const TodoList = () => {
 
   const isAssignmentSubmitted = (asg) => {
     if (isStudent) {
-      const hasSubmission = submissions.some(
-        (s) => s.assignmentId === asg.id && s.studentId === currentUser?.id
-      );
-      return hasSubmission || asg.status === 'Graded';
+      const currentUserId = currentUser?.id || currentUser?._id;
+      const asgId = asg?.id || asg?._id;
+      const hasSubmission = (submissions || []).some((s) => {
+        const subAsgId = s?.assignmentId?._id || s?.assignmentId?.id || s?.assignmentId;
+        const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+        return (
+          (String(subAsgId) === String(asgId) || String(subAsgId) === String(asg?.id) || String(subAsgId) === String(asg?._id)) &&
+          (String(subStudentId) === String(currentUserId))
+        );
+      });
+      return hasSubmission;
     }
-    return asg.status === 'Graded';
+    return false;
   };
 
   // Filter assignments for the user's courses
@@ -573,10 +580,16 @@ export const TodoList = () => {
             const course = courses.find((c) => c.id === asg.courseId);
             const publishedDate = getPublishedDate(asg);
             const submitted = isAssignmentSubmitted(asg);
-            const mySubmission = submissions.find(
-              (s) =>
-                s.assignmentId === asg.id && s.studentId === currentUser?.id
-            );
+            const asgId = asg?.id || asg?._id;
+            const currentUserId = currentUser?.id || currentUser?._id;
+            const mySubmission = (submissions || []).find((s) => {
+              const subAsgId = s?.assignmentId?._id || s?.assignmentId?.id || s?.assignmentId;
+              const subStudentId = s?.studentId?._id || s?.studentId?.id || s?.studentId;
+              return (
+                (String(subAsgId) === String(asgId) || String(subAsgId) === String(asg?.id) || String(subAsgId) === String(asg?._id)) &&
+                (String(subStudentId) === String(currentUserId))
+              );
+            });
 
             return (
               <div
