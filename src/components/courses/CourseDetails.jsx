@@ -12,6 +12,7 @@ import {
   BookOpen,
   Calendar,
   CheckCircle,
+  CheckCircle2,
   Download,
   Share2,
   Edit,
@@ -167,6 +168,11 @@ export const CourseDetails = () => {
     description: '',
   });
 
+  // Drag and drop state for rearranging lessons, materials, and assignments
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dragOverItem, setDragOverItem] = useState(null);
+  const isDraggingRef = useRef(false);
+
   const isAdmin = currentUser?.role === 'admin';
   const isTeacher = currentUser?.role === 'teacher';
 
@@ -227,11 +233,6 @@ export const CourseDetails = () => {
     });
     setOpenUnits(updated);
   };
-
-  // Drag and drop state for rearranging lessons, materials, and assignments
-  const [draggedItem, setDraggedItem] = useState(null);
-  const [dragOverItem, setDragOverItem] = useState(null);
-  const isDraggingRef = useRef(false);
 
   const handleDragStart = (e, type, unitIdx, index, item) => {
     isDraggingRef.current = true;
@@ -628,7 +629,7 @@ export const CourseDetails = () => {
   };
 
   // Enrolled students list (minimum 3 required)
-  const enrolledStudents = React.useMemo(() => {
+  const enrolledStudents = (() => {
     const list = (users || []).filter((u) => {
       if (u.role !== 'student') return false;
       const enrolled = Array.isArray(u.enrolledCourseIds) ? u.enrolledCourseIds : [];
@@ -652,7 +653,7 @@ export const CourseDetails = () => {
       }
     }
     return list;
-  }, [users, currentUser, course]);
+  })();
 
   // Assigned course instructor (1 teacher)
   const courseTeacher =
