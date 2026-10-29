@@ -12,6 +12,7 @@ import {
   BookOpen,
   Calendar,
   CheckCircle,
+  CheckCircle2,
   Download,
   Share2,
   Edit,
@@ -167,22 +168,45 @@ export const CourseDetails = () => {
     description: '',
   });
 
+  // Drag and drop state for rearranging lessons, materials, and assignments
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dragOverItem, setDragOverItem] = useState(null);
+  const isDraggingRef = useRef(false);
+
   const isAdmin = currentUser?.role === 'admin';
   const isTeacher = currentUser?.role === 'teacher';
-  const teacherCourses = isTeacher
-    ? courses.filter(
-        (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
-      )
-    : courses;
 
   const course =
-    (isTeacher ? teacherCourses : courses).find((c) => c.id === selectedCourseId) ||
-    (isTeacher ? teacherCourses[0] : courses[0]);
-  if (!course) return null;
+    courses.find((c) => c.id === selectedCourseId || c._id === selectedCourseId) ||
+    courses[0];
+
+  if (!course) {
+    return (
+      <div className="bg-white rounded-3xl p-8 border border-charcoal/10 shadow-xs text-center space-y-4 my-8 max-w-lg mx-auto">
+        <BookOpen className="w-12 h-12 text-forest/40 mx-auto" />
+        <h3 className="text-lg font-bold text-charcoal">Course Not Found</h3>
+        <p className="text-xs text-charcoal-muted max-w-sm mx-auto">
+          The requested course could not be loaded or is no longer available.
+        </p>
+        <button
+          onClick={() => setActiveTab('courses')}
+          className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all cursor-pointer"
+        >
+          Back to All Courses
+        </button>
+      </div>
+    );
+  }
 
   const isInstructor =
     isTeacher &&
-    (course.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(course.id));
+    (course.instructorId === currentUser?.id ||
+      (currentUser?._id && course.instructorId === currentUser?._id) ||
+      currentUser?.assignedCourseIds?.includes(course.id) ||
+      (course._id && currentUser?.assignedCourseIds?.includes(course._id)) ||
+      (course.instructorName &&
+        currentUser?.name &&
+        course.instructorName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()));
   const canManageCourse = isAdmin || isInstructor;
 
   const isEnrolled = currentUser?.enrolledCourseIds?.includes(course.id);
@@ -209,11 +233,6 @@ export const CourseDetails = () => {
     });
     setOpenUnits(updated);
   };
-
-  // Drag and drop state for rearranging lessons, materials, and assignments
-  const [draggedItem, setDraggedItem] = useState(null);
-  const [dragOverItem, setDragOverItem] = useState(null);
-  const isDraggingRef = useRef(false);
 
   const handleDragStart = (e, type, unitIdx, index, item) => {
     isDraggingRef.current = true;
@@ -610,7 +629,7 @@ export const CourseDetails = () => {
   };
 
   // Enrolled students list (minimum 3 required)
-  const enrolledStudents = React.useMemo(() => {
+  const enrolledStudents = (() => {
     const list = (users || []).filter((u) => {
       if (u.role !== 'student') return false;
       const enrolled = Array.isArray(u.enrolledCourseIds) ? u.enrolledCourseIds : [];
@@ -634,25 +653,31 @@ export const CourseDetails = () => {
       }
     }
     return list;
-  }, [users, currentUser, course]);
+  })();
 
   // Assigned course instructor (1 teacher)
   const courseTeacher =
     users.find(
       (u) =>
         u.role === 'teacher' &&
-        (u.id === course.instructorId ||
+        ((u.id && (u.id === course.instructorId || u.id === course.instructor?._id)) ||
+          (u._id && (u._id === course.instructorId || u._id === course.instructor?._id)) ||
           u.assignedCourseIds?.includes(course.id) ||
-          u.name.toLowerCase() === course.instructorName.toLowerCase())
+          (course._id && u.assignedCourseIds?.includes(course._id)) ||
+          (u.name &&
+            course.instructorName &&
+            u.name.trim().toLowerCase() === course.instructorName.trim().toLowerCase()))
     ) || {
-      name: course.instructorName,
-      avatar: course.instructorAvatar,
+      name: course.instructorName || 'Course Instructor',
+      avatar:
+        course.instructorAvatar ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
       email: 'instructor@cacheup.edu',
       title: 'Course Instructor',
       department: 'Academic Faculty',
     };
 
-  const isTeacherOrAdmin = currentUser?.role === 'teacher' || currentUser?.role === 'admin';
+  const isTeacherOrAdmin = canManageCourse;
   const currentMeeting = courseMeetings?.[course.id];
 
   const formatMeetingDate = (dateStr) => {

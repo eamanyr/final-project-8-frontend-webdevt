@@ -53,7 +53,14 @@ export const TodoList = () => {
   // If user is Teacher, teachers do not have a To-Do list. Render instructor submissions queue.
   if (currentUser?.role === 'teacher') {
     const teacherCourses = courses.filter(
-      (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
+      (c) =>
+        c.instructorId === currentUser?.id ||
+        (currentUser?._id && c.instructorId === currentUser?._id) ||
+        currentUser?.assignedCourseIds?.includes(c.id) ||
+        (c._id && currentUser?.assignedCourseIds?.includes(c._id)) ||
+        (c.instructorName &&
+          currentUser?.name &&
+          c.instructorName.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
     );
     const teacherCourseIds = new Set(teacherCourses.map((c) => c.id));
     const pendingTeacherSubmissions = (submissions || []).filter(

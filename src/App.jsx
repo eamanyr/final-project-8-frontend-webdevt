@@ -60,6 +60,49 @@ const PublicOnly = ({ children }) => {
   return currentUser ? <Navigate to={getHomePathForRole(currentUser.role)} replace /> : children;
 };
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="bg-white rounded-3xl p-8 border border-red-200 shadow-xs text-center space-y-4 my-8 max-w-lg mx-auto">
+          <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto font-bold text-lg">
+            !
+          </div>
+          <h3 className="text-lg font-bold text-charcoal">Something went wrong loading this page</h3>
+          <p className="text-xs text-charcoal-muted max-w-sm mx-auto font-mono bg-cream/70 p-3 rounded-xl break-words text-left">
+            {this.state.error?.message || 'An unexpected error occurred.'}
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all cursor-pointer"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => { window.location.href = '/courses'; }}
+              className="px-4 py-2 rounded-xl border border-charcoal/20 text-charcoal text-xs font-bold hover:bg-cream transition-all cursor-pointer"
+            >
+              Back to Courses
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Everything inside the app shell needs a logged-in user.
 const AppLayout = () => {
   const { currentUser } = useLMS();
@@ -75,7 +118,9 @@ const AppLayout = () => {
       <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
         <Header />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
 

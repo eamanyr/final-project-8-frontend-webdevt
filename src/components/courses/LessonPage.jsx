@@ -44,16 +44,28 @@ export const LessonPage = () => {
   } = useLMS();
 
   const isTeacher = currentUser?.role === 'teacher';
-  const availableCourses = isTeacher
-    ? courses.filter(
-        (c) => c.instructorId === currentUser?.id || currentUser?.assignedCourseIds?.includes(c.id)
-      )
-    : courses;
 
   const course =
-    (isTeacher ? availableCourses : courses).find((c) => c.id === selectedCourseId) ||
-    (isTeacher ? availableCourses[0] : courses[0]);
-  if (!course) return null;
+    courses.find((c) => c.id === selectedCourseId || c._id === selectedCourseId) ||
+    courses[0];
+
+  if (!course) {
+    return (
+      <div className="bg-white rounded-3xl p-8 border border-charcoal/10 shadow-xs text-center space-y-4 my-8 max-w-lg mx-auto">
+        <BookOpen className="w-12 h-12 text-forest/40 mx-auto" />
+        <h3 className="text-lg font-bold text-charcoal">Lesson Not Found</h3>
+        <p className="text-xs text-charcoal-muted max-w-sm mx-auto">
+          The requested course or lesson could not be loaded.
+        </p>
+        <button
+          onClick={() => setActiveTab('courses')}
+          className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all cursor-pointer"
+        >
+          Back to All Courses
+        </button>
+      </div>
+    );
+  }
 
   const courseAssignments = assignments.filter((a) => a.courseId === course.id);
   const courseMaterials = materials.filter((m) => m.courseId === course.id);
