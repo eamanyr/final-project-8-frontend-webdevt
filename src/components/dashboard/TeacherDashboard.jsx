@@ -15,6 +15,7 @@ import {
   Clock,
   Eye
 } from 'lucide-react';
+import { handleCoverError, resolveCourseCover } from '../../data/coverImages';
 
 export const TeacherDashboard = () => {
   const {
@@ -285,11 +286,9 @@ export const TeacherDashboard = () => {
             >
               <div className="flex items-center gap-3 min-w-0">
                 <img
-                  src={course.thumbnail}
+                  src={resolveCourseCover(course.thumbnail)}
                   alt=""
-                  onError={(e) => {
-                    e.currentTarget.src = 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80';
-                  }}
+                  onError={handleCoverError}
                   className="w-16 h-16 rounded-xl object-cover border border-charcoal/10 shrink-0"
                 />
                 <div className="min-w-0">

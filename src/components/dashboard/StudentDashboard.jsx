@@ -18,6 +18,7 @@ import {
   Star,
   Search
 } from 'lucide-react';
+import { handleCoverError, resolveCourseCover } from '../../data/coverImages';
 
 export const StudentDashboard = () => {
   const {
@@ -358,11 +359,9 @@ export const StudentDashboard = () => {
                     {/* Course Image Header */}
                     <div className="relative h-44 overflow-hidden">
                       <img
-                        src={course.thumbnail}
+                        src={resolveCourseCover(course.thumbnail)}
                         alt={course.title}
-                        onError={(e) => {
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80';
-                        }}
+                        onError={handleCoverError}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />

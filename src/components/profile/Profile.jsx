@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { WeeklyCalendarGrid } from '../schedule/WeeklyCalendarGrid';
+import { handleCoverError, resolveCourseCover } from '../../data/coverImages';
 
 export const Profile = () => {
   const {
@@ -128,11 +129,9 @@ export const Profile = () => {
                   className="p-4 rounded-2xl border border-charcoal/10 bg-cream/30 hover:border-forest/30 hover:shadow-xs transition-all cursor-pointer flex items-center gap-3"
                 >
                   <img
-                    src={c.thumbnail}
+                    src={resolveCourseCover(c.thumbnail)}
                     alt=""
-                    onError={(e) => {
-                      e.currentTarget.src = 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80';
-                    }}
+                    onError={handleCoverError}
                     className="w-14 h-14 rounded-xl object-cover border border-charcoal/10 shrink-0"
                   />
                   <div className="min-w-0">

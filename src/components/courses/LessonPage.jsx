@@ -18,6 +18,7 @@ import {
   ChevronUp,
   HelpCircle,
 } from 'lucide-react';
+import { handleCoverError, resolveCourseCover } from '../../data/coverImages';
 
 export const LessonPage = () => {
   const {
@@ -297,15 +298,9 @@ export const LessonPage = () => {
             </div>
             {course.thumbnail && (
               <img
-                src={course.thumbnail}
+                src={resolveCourseCover(course.thumbnail)}
                 alt=""
-                onError={(e) => {
-                  if (e.currentTarget.src !== 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80') {
-                    e.currentTarget.src = 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80';
-                  } else {
-                    e.currentTarget.style.display = 'none';
-                  }
-                }}
+                onError={handleCoverError}
                 className="absolute inset-0 w-full h-full object-cover"
               />
             )}
