@@ -14,7 +14,7 @@ export const CourseForm = () => {
     totalLessons: 18,
     schedule: 'Tue & Thu • 10:00 AM - 12:00 PM',
     room: 'Studio Hall 3A',
-    thumbnail: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=600&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80',
     description: '',
     syllabus: [
       { unit: 'Unit 1', title: 'Foundations & Visual Anatomy', lessons: 6 },
@@ -24,7 +24,7 @@ export const CourseForm = () => {
   });
 
   const thumbnailPresets = [
-    { label: 'Abstract Art', url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=600&q=80' },
+    { label: 'Abstract Art', url: 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80' },
     { label: 'Sketching', url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80' },
     { label: 'Typography', url: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80' },
     { label: 'Web UI / Dev', url: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=600&q=80' },
@@ -226,6 +226,9 @@ export const CourseForm = () => {
                   <img
                     src={preset.url}
                     alt={preset.label}
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80';
+                    }}
                     className="h-20 w-full object-cover"
                   />
                   <div className="p-1.5 bg-white text-[10px] font-semibold text-charcoal text-center">

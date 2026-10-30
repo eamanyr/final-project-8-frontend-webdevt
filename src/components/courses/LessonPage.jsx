@@ -300,7 +300,11 @@ export const LessonPage = () => {
                 src={course.thumbnail}
                 alt=""
                 onError={(e) => {
-                  e.currentTarget.style.display = 'none';
+                  if (e.currentTarget.src !== 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80') {
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80';
+                  } else {
+                    e.currentTarget.style.display = 'none';
+                  }
                 }}
                 className="absolute inset-0 w-full h-full object-cover"
               />

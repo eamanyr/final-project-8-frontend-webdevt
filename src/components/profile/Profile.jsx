@@ -130,6 +130,9 @@ export const Profile = () => {
                   <img
                     src={c.thumbnail}
                     alt=""
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80';
+                    }}
                     className="w-14 h-14 rounded-xl object-cover border border-charcoal/10 shrink-0"
                   />
                   <div className="min-w-0">
