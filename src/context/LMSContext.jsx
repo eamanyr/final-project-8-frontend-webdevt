@@ -19,6 +19,7 @@ import {
 } from '../data/mockData';
 import { getDefaultUnitLessons } from '../data/courseCurriculum';
 import { api } from '../services/api';
+import { resolveCourseCover } from '../data/coverImages';
 
 const LMSContext = createContext(null);
 
@@ -99,9 +100,7 @@ export const LMSProvider = ({ children }) => {
         const combined = [...parsed, ...missing];
         return combined.map((c) => {
           const init = INITIAL_COURSES.find((ic) => ic.id === c.id);
-          const dynamicThumb = c.thumbnail?.includes('photo-1579783902614-a3fb3927b675')
-            ? 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80'
-            : c.thumbnail;
+          const dynamicThumb = resolveCourseCover(c.thumbnail);
           if (init) {
             const syllabus = c.syllabus && c.syllabus.length ? c.syllabus : init.syllabus;
             const totalLessons = c.totalLessons ?? (
@@ -533,6 +532,7 @@ export const LMSProvider = ({ children }) => {
       );
       return {
         ...c,
+        thumbnail: resolveCourseCover(c.thumbnail),
         totalLessons,
         completedLessons,
         progress,
@@ -1041,7 +1041,7 @@ export const LMSProvider = ({ children }) => {
       rating: 5.0,
       color: courseData.color || '#1e3f33',
       badge: 'New Course',
-      thumbnail: courseData.thumbnail || 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80',
+      thumbnail: resolveCourseCover(courseData.thumbnail),
       description: courseData.description || 'Modern learning module on CacheUp.',
       schedule: courseData.schedule || 'Flexible Online Sessions',
       room: courseData.room || 'Virtual Lab 1',

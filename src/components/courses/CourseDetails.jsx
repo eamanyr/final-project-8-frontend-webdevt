@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { QuizModal } from '../quizzes/QuizModal';
 import { QuizTakeModal } from '../quizzes/QuizTakeModal';
+import { handleCoverError, resolveCourseCover } from '../../data/coverImages';
 
 export const CourseDetails = () => {
   const {
@@ -804,15 +805,9 @@ export const CourseDetails = () => {
       <div className="relative overflow-hidden rounded-3xl bg-white border border-charcoal/10 shadow-xs">
         <div className="h-48 sm:h-64 relative bg-gradient-to-r from-forest via-forest-light to-sage">
           <img
-            src={course.thumbnail}
+            src={resolveCourseCover(course.thumbnail)}
             alt=""
-            onError={(e) => {
-              if (e.currentTarget.src !== 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80') {
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80';
-              } else {
-                e.currentTarget.style.display = 'none';
-              }
-            }}
+            onError={handleCoverError}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />

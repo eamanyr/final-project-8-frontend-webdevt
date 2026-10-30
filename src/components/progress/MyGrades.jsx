@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ExternalLink,
 } from 'lucide-react';
+import { resolveCourseCover } from '../../data/coverImages';
 
 export const MyGrades = () => {
   const {
@@ -217,7 +218,7 @@ export const MyGrades = () => {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         <img
-                          src={course?.thumbnail || 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80'}
+                          src={resolveCourseCover(course?.thumbnail)}
                           alt={course?.title || 'Course'}
                           className="w-12 h-12 rounded-xl object-cover shrink-0 border border-charcoal/10 shadow-2xs"
                         />
