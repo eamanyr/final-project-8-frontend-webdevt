@@ -6,8 +6,10 @@ import { Header } from './components/layout/Header';
 import { RightPanel } from './components/layout/RightPanel';
 import { HelpModal } from './components/layout/HelpModal';
 import { ToastContainer } from './components/common/ToastContainer';
+import { ThemeToggle } from './components/common/ThemeToggle';
 
 // Public pages
+import { Welcome } from './components/welcome/Welcome';
 import { Login } from './components/auth/Login';
 import { Register } from './components/auth/Register';
 
@@ -54,10 +56,17 @@ const getHomePathForRole = (role) => {
   return '/dashboard';
 };
 
-// Login / Register: logged-in users go straight to their dashboard.
-const PublicOnly = ({ children }) => {
+// Welcome / Login / Register: logged-in users go straight to their dashboard.
+// showToggle adds a small light/dark button in the corner (Welcome has its own in its top bar).
+const PublicOnly = ({ children, showToggle = false }) => {
   const { currentUser } = useLMS();
-  return currentUser ? <Navigate to={getHomePathForRole(currentUser.role)} replace /> : children;
+  if (currentUser) return <Navigate to={getHomePathForRole(currentUser.role)} replace />;
+  return (
+    <>
+      {showToggle && <ThemeToggle className="fixed top-4 right-4 z-50" />}
+      {children}
+    </>
+  );
 };
 
 class ErrorBoundary extends React.Component {
@@ -153,10 +162,9 @@ const AppRoutes = () => (
   <>
     <Routes>
       {/* Public */}
-      {/* CHANGED: the home page now goes straight to login */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
-      <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
+      <Route path="/" element={<PublicOnly><Welcome /></PublicOnly>} />
+      <Route path="/login" element={<PublicOnly showToggle><Login /></PublicOnly>} />
+      <Route path="/register" element={<PublicOnly showToggle><Register /></PublicOnly>} />
 
       {/* Logged-in app */}
       <Route element={<AppLayout />}>

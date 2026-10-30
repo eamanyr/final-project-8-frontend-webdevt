@@ -135,21 +135,21 @@ export const TeacherDashboard = () => {
       </div>
 
       {/* Urgent Grading Queue */}
-      <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+      <div className="@container bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-bold font-heading text-charcoal">
               Submissions Awaiting Grading
             </h3>
             {pendingSubmissions.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 whitespace-nowrap">
                 {pendingSubmissions.length} pending
               </span>
             )}
           </div>
           <button
             onClick={() => setActiveTab('submissions')}
-            className="text-xs font-bold text-forest hover:text-gold transition-colors flex items-center gap-1"
+            className="text-xs font-bold text-forest hover:text-gold transition-colors flex items-center gap-1 whitespace-nowrap"
           >
             <span>View All Submissions</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -161,65 +161,111 @@ export const TeacherDashboard = () => {
             🎉 All caught up! No student submissions currently require grading.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-charcoal/10 text-charcoal-muted uppercase text-[10px] tracking-wider">
-                  <th className="pb-3 font-bold">Student</th>
-                  <th className="pb-3 font-bold">Assignment</th>
-                  <th className="pb-3 font-bold">Submitted Date</th>
-                  <th className="pb-3 font-bold">Attachment</th>
-                  <th className="pb-3 font-bold text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-charcoal/5">
-                {pendingSubmissions.map((sub) => (
-                  <tr key={sub.id} className="hover:bg-cream/40 transition-colors">
-                    <td className="py-3">
-                      <div className="flex items-center gap-2.5">
-                        <img
-                          src={sub.studentAvatar}
-                          alt=""
-                          className="w-8 h-8 rounded-full object-cover border border-charcoal/10"
-                        />
-                        <span className="font-semibold text-charcoal">
-                          {sub.studentName}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 font-medium text-charcoal max-w-xs truncate">
-                      {sub.assignmentTitle}
-                    </td>
-                    <td className="py-3 text-charcoal-muted">
-                      {sub.submissionDate}
-                    </td>
-                    <td className="py-3">
-                      <span className="text-[11px] font-mono text-forest bg-sage/20 px-2 py-0.5 rounded-md">
-                        {sub.fileName}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedSubmissionId(sub.id);
-                          setActiveTab('submissions');
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-forest text-cream text-[11px] font-bold hover:bg-forest-light transition-all shadow-xs"
-                      >
-                        Grade Work
-                      </button>
-                    </td>
+          <>
+            {/* Narrow space: one card per submission */}
+            <ul className="@3xl:hidden space-y-3">
+              {pendingSubmissions.map((sub) => (
+                <li
+                  key={sub.id}
+                  className="p-4 rounded-2xl border border-charcoal/10 bg-cream/40"
+                >
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={sub.studentAvatar}
+                      alt=""
+                      className="w-9 h-9 rounded-full object-cover border border-charcoal/10 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-charcoal truncate">
+                        {sub.studentName}
+                      </p>
+                      <p className="text-[11px] text-charcoal-muted">
+                        Submitted {sub.submissionDate}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mt-3 text-xs font-medium text-charcoal">
+                    {sub.assignmentTitle}
+                  </p>
+                  <span className="mt-2 inline-block max-w-full truncate align-middle text-[11px] font-mono text-forest bg-sage/20 px-2 py-0.5 rounded-md">
+                    {sub.fileName}
+                  </span>
+
+                  <button
+                    onClick={() => {
+                      setSelectedSubmissionId(sub.id);
+                      setActiveTab('submissions');
+                    }}
+                    className="mt-3 w-full px-3 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all shadow-xs"
+                  >
+                    Grade Work
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {/* Wide space: the normal table */}
+            <div className="hidden @3xl:block overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-xs">
+                <thead>
+                  <tr className="border-b border-charcoal/10 text-charcoal-muted uppercase text-[10px] tracking-wider">
+                    <th className="pb-3 pr-4 font-bold">Student</th>
+                    <th className="pb-3 pr-4 font-bold">Assignment</th>
+                    <th className="pb-3 pr-4 font-bold">Submitted Date</th>
+                    <th className="pb-3 pr-4 font-bold">Attachment</th>
+                    <th className="pb-3 font-bold text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-charcoal/5">
+                  {pendingSubmissions.map((sub) => (
+                    <tr key={sub.id} className="hover:bg-cream/40 transition-colors">
+                      <td className="py-3 pr-4">
+                        <div className="flex items-center gap-2.5">
+                          <img
+                            src={sub.studentAvatar}
+                            alt=""
+                            className="w-8 h-8 rounded-full object-cover border border-charcoal/10"
+                          />
+                          <span className="font-semibold text-charcoal">
+                            {sub.studentName}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 font-medium text-charcoal max-w-xs truncate">
+                        {sub.assignmentTitle}
+                      </td>
+                      <td className="py-3 pr-4 text-charcoal-muted whitespace-nowrap">
+                        {sub.submissionDate}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span className="text-[11px] font-mono text-forest bg-sage/20 px-2 py-0.5 rounded-md">
+                          {sub.fileName}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right">
+                        <button
+                          onClick={() => {
+                            setSelectedSubmissionId(sub.id);
+                            setActiveTab('submissions');
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-forest text-cream text-[11px] font-bold hover:bg-forest-light transition-all shadow-xs whitespace-nowrap"
+                        >
+                          Grade Work
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
       {/* Courses Taught by Teacher */}
-      <div className="bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
+      <div className="@container bg-white rounded-3xl p-6 border border-charcoal/10 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <h3 className="text-base font-bold font-heading text-charcoal">
             My Courses & Class Lists
           </h3>
@@ -231,19 +277,19 @@ export const TeacherDashboard = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 @2xl:grid-cols-2 gap-4">
           {myCourses.map((course) => (
             <div
               key={course.id}
               className="p-4 rounded-2xl border border-charcoal/10 bg-cream/30 flex items-center justify-between gap-4"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <img
                   src={course.thumbnail}
                   alt=""
                   className="w-16 h-16 rounded-xl object-cover border border-charcoal/10 shrink-0"
                 />
-                <div>
+                <div className="min-w-0">
                   <span className="text-[10px] font-bold uppercase text-forest">
                     {course.code}
                   </span>
@@ -267,7 +313,7 @@ export const TeacherDashboard = () => {
                     setSelectedCourseId(course.id);
                     setActiveTab('course-details');
                   }}
-                  className="px-3 py-1 rounded-xl bg-charcoal text-cream text-[11px] font-bold hover:bg-charcoal-light transition-colors"
+                  className="px-3 py-1 rounded-xl bg-charcoal text-cream text-[11px] font-bold hover:bg-charcoal-light transition-colors whitespace-nowrap"
                 >
                   View Class
                 </button>

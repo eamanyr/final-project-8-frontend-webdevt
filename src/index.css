@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
 @theme {
   --font-heading: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
@@ -70,4 +72,61 @@ h1, h2, h3, h4, h5, h6 {
   button:disabled {
     cursor: not-allowed;
   }
+}
+
+/* Smooth scrolling for the "About Us" link */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Dark mode: same color names, different values */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-white: #1b2420;
+
+  --color-cream: #121815;
+  --color-cream-card: #1b2420;
+  --color-cream-dark: #232d28;
+  --color-cream-50: #161d19;
+
+  --color-charcoal: #ece7da;
+  --color-charcoal-light: #ffffff;
+  --color-charcoal-muted: #a3aea7;
+  --color-charcoal-dark: #ffffff;
+
+  /* softer green so it is easier on the eyes */
+  --color-forest: #5f9c7e;
+  --color-forest-dark: #4b8567;
+  --color-forest-light: #74ae91;
+  --color-forest-50: #1a2a22;
+  --color-forest-100: #223a2e;
+
+  --color-sage: #7f9b7d;
+  --color-sage-dark: #9cb49a;
+  --color-sage-light: #2a382a;
+  --color-sage-50: #1a231a;
+
+  --color-gold: #e6a840;
+  --color-gold-light: #3a2e14;
+  --color-gold-hover: #f0b95a;
+  --color-gold-dark: #f1c46e;
+}
+
+/* Gold backgrounds always keep dark text so they stay readable */
+:root[data-theme='dark'] .bg-gold,
+:root[data-theme='dark'] .bg-gold * {
+  color: #1b1b18;
+}
+
+/* Keep the logo tile deep green so the gold sparkle stands out */
+:root[data-theme='dark'] .bg-forest.text-gold {
+  background-color: #1e3f33;
+  box-shadow: inset 0 0 0 1px rgba(95, 156, 126, 0.45);
+}
+
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: rgba(236, 231, 218, 0.25);
 }
