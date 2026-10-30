@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLMS } from '../../context/LMSContext';
+import { ThemeToggle } from '../common/ThemeToggle';
 import {
   Bell,
   Menu,
@@ -69,8 +70,11 @@ export const Header = () => {
           </div>
         </div>
 
-        {/* Right Actions: Notifications + Panel Toggle */}
+        {/* Right Actions: Theme + Notifications + Panel Toggle */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Light / dark mode */}
+          <ThemeToggle />
+
           {/* Notifications Dropdown */}
           <div className="relative" ref={notifRef}>
             <button

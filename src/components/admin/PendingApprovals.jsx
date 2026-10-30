@@ -133,10 +133,10 @@ export const PendingApprovals = () => {
                   key={student.id}
                   className={`p-5 rounded-2xl border transition-all ${
                     isPending
-                      ? 'bg-amber-50/40 border-amber-200'
+                      ? 'bg-amber-50/40 border-amber-200 dark:bg-cream-dark dark:border-gold/40'
                       : isApproved
-                      ? 'bg-white border-charcoal/10'
-                      : 'bg-red-50/30 border-red-200'
+                      ? 'bg-white border-charcoal/10 dark:bg-cream-dark'
+                      : 'bg-red-50/30 border-red-200 dark:bg-red-500/10 dark:border-red-400/40'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -154,10 +154,10 @@ export const PendingApprovals = () => {
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                               isPending
-                                ? 'bg-amber-100 text-amber-800'
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300'
                                 : isApproved
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-red-100 text-red-800'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-300'
+                                : 'bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-300'
                             }`}
                           >
                             {student.status}
@@ -174,13 +174,13 @@ export const PendingApprovals = () => {
                       </div>
                     </div>
 
-                    <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-white border border-charcoal/10 text-forest">
+                    <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-white border border-charcoal/10 text-forest dark:bg-cream">
                       {student.studentId}
                     </span>
                   </div>
 
                   {/* Bio & Application Notes */}
-                  <div className="mt-4 p-3 rounded-xl bg-white/70 border border-charcoal/10 text-xs">
+                  <div className="mt-4 p-3 rounded-xl bg-white/70 border border-charcoal/10 text-xs dark:bg-cream/60">
                     <p className="text-charcoal-muted leading-relaxed">
                       {student.bio || student.registrationNotes || 'No additional notes provided.'}
                     </p>
@@ -202,7 +202,7 @@ export const PendingApprovals = () => {
                         <>
                           <button
                             onClick={() => handleOpenReject(student)}
-                            className="px-3 py-1.5 rounded-xl border border-red-200 text-red-700 hover:bg-red-50 text-xs font-bold transition-colors flex items-center gap-1"
+                            className="px-3 py-1.5 rounded-xl border border-red-200 text-red-700 hover:bg-red-50 text-xs font-bold transition-colors flex items-center gap-1 dark:border-red-400/50 dark:text-red-300 dark:hover:bg-red-400/10"
                           >
                             <X className="w-3.5 h-3.5" />
                             <span>Reject</span>
@@ -216,7 +216,7 @@ export const PendingApprovals = () => {
                           </button>
                         </>
                       ) : isApproved ? (
-                        <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                        <span className="text-xs font-bold text-emerald-700 flex items-center gap-1 dark:text-emerald-300">
                           <Check className="w-4 h-4" /> Enrolled & Authorized
                         </span>
                       ) : (
@@ -238,7 +238,7 @@ export const PendingApprovals = () => {
 
       {/* Reject Modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/50 backdrop-blur-xs dark:bg-black/60">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-charcoal/15 shadow-2xl">
             <h3 className="text-base font-bold font-heading text-charcoal">
               Reject Student Application
