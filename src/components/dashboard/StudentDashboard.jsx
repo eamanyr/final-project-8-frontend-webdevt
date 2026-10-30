@@ -360,6 +360,9 @@ export const StudentDashboard = () => {
                       <img
                         src={course.thumbnail}
                         alt={course.title}
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=600&q=80';
+                        }}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
