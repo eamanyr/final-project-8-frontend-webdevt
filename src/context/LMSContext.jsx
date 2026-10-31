@@ -1734,11 +1734,12 @@ export const LMSProvider = ({ children }) => {
       courseTitle: course ? course.title : (data.courseTitle || 'Course Material'),
       title: data.title,
       type: data.type || 'pdf',
-      size: data.size || '4.5 MB',
+      size: data.size || '',
+      fileName: data.fileName || '',
       uploadDate: new Date().toISOString().slice(0, 10),
       uploadedBy: currentUser?.name || 'Instructor',
-      downloadUrl: data.downloadUrl || '#',
-      description: data.description || 'Uploaded study resource for CacheUp students.',
+      downloadUrl: data.downloadUrl || '',
+      description: data.description || '',
       unitIdx:
         data.unitIdx !== undefined && data.unitIdx !== '' && data.unitIdx !== 'all'
           ? Number(data.unitIdx)

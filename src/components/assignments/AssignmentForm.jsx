@@ -33,20 +33,16 @@ export const AssignmentForm = () => {
   const [selectedEditId, setSelectedEditId] = useState(selectedAssignmentId || assignments[0]?.id || '');
 
   const [formData, setFormData] = useState({
-    courseId: availableCourses[0]?.id || 'crs-1',
-    unitIdx: 0,
+    courseId: '',
+    unitIdx: '',
     title: '',
     description: '',
-    dueDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-    dueTime: '11:59 PM',
-    duration: '2 hours 30 min',
-    maxScore: 100,
-    priority: 'High',
-    rubric: [
-      { criteria: 'Technical Execution & Precision', points: 40 },
-      { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
-      { criteria: 'Documentation & Presentation', points: 25 },
-    ],
+    dueDate: '',
+    dueTime: '',
+    duration: '',
+    maxScore: '',
+    priority: '',
+    rubric: [],
   });
 
   // If in edit mode, populate form
@@ -55,29 +51,23 @@ export const AssignmentForm = () => {
     const target = assignments.find((a) => a.id === asgId);
     if (target) {
       setFormData({
-        courseId: target.courseId || availableCourses[0]?.id || 'crs-1',
-        unitIdx: target.unitIdx !== undefined ? target.unitIdx : 0,
+        courseId: target.courseId || '',
+        unitIdx: target.unitIdx !== undefined ? target.unitIdx : '',
         title: target.title || '',
         description: target.description || '',
-        dueDate: target.dueDate || new Date().toISOString().slice(0, 10),
-        dueTime: target.dueTime || '11:59 PM',
-        duration: target.duration || '2 hours',
-        maxScore: target.maxScore || 100,
-        priority: target.priority || 'Medium',
-        rubric: target.rubric && target.rubric.length
-          ? target.rubric
-          : [
-              { criteria: 'Technical Execution & Precision', points: 40 },
-              { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
-              { criteria: 'Documentation & Presentation', points: 25 },
-            ],
+        dueDate: target.dueDate || '',
+        dueTime: target.dueTime || '',
+        duration: target.duration || '',
+        maxScore: target.maxScore || '',
+        priority: target.priority || '',
+        rubric: target.rubric && target.rubric.length ? target.rubric : [],
       });
     }
   };
 
   const handleAddRubricItem = () => {
     setFormData((prev) => {
-      const updatedRubric = [...prev.rubric, { criteria: 'New Studio Criterion', points: 10 }];
+      const updatedRubric = [...prev.rubric, { criteria: '', points: '' }];
       const sum = updatedRubric.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
       return {
         ...prev,
@@ -104,7 +94,7 @@ export const AssignmentForm = () => {
       const updated = [...prev.rubric];
       updated[idx] = {
         ...updated[idx],
-        [field]: field === 'points' ? Math.max(0, parseInt(value) || 0) : value,
+        [field]: field === 'points' ? (value === '' ? '' : Math.max(0, parseInt(value) || 0)) : value,
       };
       const sum = updated.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
       return {
@@ -123,12 +113,16 @@ export const AssignmentForm = () => {
     }
 
     const totalRubricPts = formData.rubric.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
-    const finalMaxScore = totalRubricPts > 0 ? totalRubricPts : parseInt(formData.maxScore) || 100;
+    const finalMaxScore = totalRubricPts > 0 ? totalRubricPts : parseInt(formData.maxScore) || 0;
+    if (!finalMaxScore) {
+      alert('Please enter the maximum score or add rubric criteria with points.');
+      return;
+    }
 
     const payload = {
       ...formData,
       maxScore: finalMaxScore,
-      unitIdx: Number(formData.unitIdx) || 0,
+      unitIdx: Number(formData.unitIdx),
     };
 
     if (mode === 'edit' && selectedEditId) {
@@ -227,10 +221,12 @@ export const AssignmentForm = () => {
                 Target Course
               </label>
               <select
+                required
                 value={formData.courseId}
-                onChange={(e) => setFormData({ ...formData, courseId: e.target.value, unitIdx: 0 })}
+                onChange={(e) => setFormData({ ...formData, courseId: e.target.value, unitIdx: '' })}
                 className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest font-semibold"
               >
+                <option value="" disabled>Select a course</option>
                 {availableCourses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.title} ({c.code})
@@ -244,10 +240,12 @@ export const AssignmentForm = () => {
                 Target Curriculum Unit
               </label>
               <select
+                required
                 value={formData.unitIdx}
                 onChange={(e) => setFormData({ ...formData, unitIdx: Number(e.target.value) })}
                 className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest font-semibold"
               >
+                <option value="" disabled>Select a unit</option>
                 {(selectedCourseObj?.syllabus || []).map((u, uIdx) => (
                   <option key={uIdx} value={uIdx}>
                     {u.unit || `Unit ${uIdx + 1}`}: {u.title}
@@ -291,6 +289,7 @@ export const AssignmentForm = () => {
               </label>
               <input
                 type="text"
+                required
                 value={formData.dueTime}
                 onChange={(e) => setFormData({ ...formData, dueTime: e.target.value })}
                 placeholder="11:59 PM"
@@ -306,6 +305,7 @@ export const AssignmentForm = () => {
                 type="number"
                 min="10"
                 max="500"
+                required={formData.rubric.length === 0}
                 value={formData.maxScore}
                 onChange={(e) => setFormData({ ...formData, maxScore: e.target.value })}
                 className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest font-bold"
@@ -317,10 +317,12 @@ export const AssignmentForm = () => {
                 Priority
               </label>
               <select
+                required
                 value={formData.priority}
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                 className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-hidden focus:border-forest"
               >
+                <option value="" disabled>Select priority</option>
                 <option value="High">High Priority</option>
                 <option value="Medium">Medium Priority</option>
                 <option value="Low">Low Priority</option>
@@ -385,7 +387,7 @@ export const AssignmentForm = () => {
                     className="w-20 bg-white border border-charcoal/10 rounded-lg px-2 py-1.5 text-xs text-charcoal text-center font-bold font-mono focus:outline-hidden focus:border-forest"
                   />
                   <span className="text-[11px] text-charcoal-muted font-semibold">Pts</span>
-                  {formData.rubric.length > 1 && (
+                  {formData.rubric.length > 0 && (
                     <button
                       type="button"
                       onClick={() => handleRemoveRubricItem(idx)}
