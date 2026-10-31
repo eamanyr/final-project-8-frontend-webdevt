@@ -24,10 +24,10 @@ export const QuizModal = ({ course, editingQuiz, initialUnitIdx = 0, onClose }) 
         unitIdx: editingQuiz.unitIdx !== undefined ? editingQuiz.unitIdx : initialUnitIdx,
         title: editingQuiz.title || '',
         description: editingQuiz.description || '',
-        dueDate: editingQuiz.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-        dueTime: editingQuiz.dueTime || '11:59 PM',
-        timeLimitMinutes: editingQuiz.timeLimitMinutes || 20,
-        passingScorePercent: editingQuiz.passingScorePercent || 70,
+        dueDate: editingQuiz.dueDate || '',
+        dueTime: editingQuiz.dueTime || '',
+        timeLimitMinutes: editingQuiz.timeLimitMinutes || '',
+        passingScorePercent: editingQuiz.passingScorePercent || '',
         questions: editingQuiz.questions && editingQuiz.questions.length
           ? editingQuiz.questions
           : [
@@ -45,18 +45,18 @@ export const QuizModal = ({ course, editingQuiz, initialUnitIdx = 0, onClose }) 
     return {
       unitIdx: initialUnitIdx,
       title: '',
-      description: 'Answer all multiple choice questions based on unit lectures and studio practice.',
-      dueDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-      dueTime: '11:59 PM',
-      timeLimitMinutes: 20,
-      passingScorePercent: 70,
+      description: '',
+      dueDate: '',
+      dueTime: '',
+      timeLimitMinutes: '',
+      passingScorePercent: '',
       questions: [
         {
           id: `q-${Date.now()}-1`,
           prompt: '',
-          points: 10,
-          options: ['Option A', 'Option B', 'Option C', 'Option D'],
-          correctOptionIndex: 0,
+          points: '',
+          options: ['', '', '', ''],
+          correctOptionIndex: null,
           explanation: '',
         },
       ],
@@ -74,9 +74,9 @@ export const QuizModal = ({ course, editingQuiz, initialUnitIdx = 0, onClose }) 
         {
           id: `q-${Date.now()}-${prev.questions.length + 1}`,
           prompt: '',
-          points: 10,
-          options: ['Option A', 'Option B', 'Option C', 'Option D'],
-          correctOptionIndex: 0,
+          points: '',
+          options: ['', '', '', ''],
+          correctOptionIndex: null,
           explanation: '',
         },
       ],
@@ -97,7 +97,7 @@ export const QuizModal = ({ course, editingQuiz, initialUnitIdx = 0, onClose }) 
       const updated = [...prev.questions];
       updated[qIdx] = {
         ...updated[qIdx],
-        [field]: field === 'points' ? Math.max(1, parseInt(value) || 0) : value,
+        [field]: field === 'points' ? (value === '' ? '' : Math.max(1, parseInt(value) || 1)) : value,
       };
       return { ...prev, questions: updated };
     });
@@ -121,7 +121,7 @@ export const QuizModal = ({ course, editingQuiz, initialUnitIdx = 0, onClose }) 
       if (updated[qIdx].options.length >= 6) return prev;
       updated[qIdx] = {
         ...updated[qIdx],
-        options: [...updated[qIdx].options, `Option ${String.fromCharCode(65 + updated[qIdx].options.length)}`],
+        options: [...updated[qIdx].options, ''],
       };
       return { ...prev, questions: updated };
     });
@@ -134,8 +134,8 @@ export const QuizModal = ({ course, editingQuiz, initialUnitIdx = 0, onClose }) 
       if (updated[qIdx].options.length <= 2) return prev;
       const updatedOpts = updated[qIdx].options.filter((_, idx) => idx !== optIdx);
       let correctIdx = updated[qIdx].correctOptionIndex;
-      if (correctIdx === optIdx) correctIdx = 0;
-      else if (correctIdx > optIdx) correctIdx -= 1;
+      if (correctIdx === optIdx) correctIdx = null;
+      else if (correctIdx !== null && correctIdx > optIdx) correctIdx -= 1;
 
       updated[qIdx] = {
         ...updated[qIdx],
@@ -174,11 +174,28 @@ export const QuizModal = ({ course, editingQuiz, initialUnitIdx = 0, onClose }) 
       return;
     }
 
+    if (!formData.dueDate || !formData.dueTime.trim()) {
+      setErrorMessage('Please set the due date and due time.');
+      return;
+    }
+    if (!Number(formData.timeLimitMinutes) || !Number(formData.passingScorePercent)) {
+      setErrorMessage('Please enter the time limit and passing score.');
+      return;
+    }
+
     // Validate that questions have prompts and options
     for (let i = 0; i < formData.questions.length; i++) {
       const q = formData.questions[i];
       if (!q.prompt.trim()) {
         setErrorMessage(`Question ${i + 1} prompt cannot be empty.`);
+        return;
+      }
+      if (!Number(q.points)) {
+        setErrorMessage(`Question ${i + 1} needs a points value.`);
+        return;
+      }
+      if (q.correctOptionIndex === null || q.correctOptionIndex === undefined) {
+        setErrorMessage(`Select the correct answer for Question ${i + 1}.`);
         return;
       }
       for (let j = 0; j < q.options.length; j++) {
@@ -194,12 +211,12 @@ export const QuizModal = ({ course, editingQuiz, initialUnitIdx = 0, onClose }) 
       courseName: course.title,
       unitIdx: Number(formData.unitIdx),
       title: formData.title.trim(),
-      description: formData.description.trim() || 'Answer all multiple choice questions.',
+      description: formData.description.trim(),
       dueDate: formData.dueDate,
-      dueTime: formData.dueTime || '11:59 PM',
+      dueTime: formData.dueTime,
       duration: `${formData.timeLimitMinutes} minutes`,
-      timeLimitMinutes: Number(formData.timeLimitMinutes) || 20,
-      passingScorePercent: Number(formData.passingScorePercent) || 70,
+      timeLimitMinutes: Number(formData.timeLimitMinutes),
+      passingScorePercent: Number(formData.passingScorePercent),
       totalPoints,
       questions: formData.questions,
     };

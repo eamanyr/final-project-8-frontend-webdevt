@@ -67,8 +67,8 @@ export const Announcements = () => {
 
   const [formData, setFormData] = useState({
     title: '',
-    courseId: 'all',
-    priority: 'Normal',
+    courseId: '',
+    priority: '',
     content: '',
   });
 
@@ -107,7 +107,7 @@ export const Announcements = () => {
     if (!formData.title || !formData.content) return;
     addAnnouncement(formData);
     setShowCreateModal(false);
-    setFormData({ title: '', courseId: 'all', priority: 'Normal', content: '' });
+    setFormData({ title: '', courseId: '', priority: '', content: '' });
   };
 
   const handleOpenAnnouncement = (item) => {
@@ -431,10 +431,12 @@ export const Announcements = () => {
                   Target Audience / Course
                 </label>
                 <select
+                  required
                   value={formData.courseId}
                   onChange={(e) => setFormData({ ...formData, courseId: e.target.value })}
                   className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
                 >
+                  <option value="" disabled>Select an audience</option>
                   <option value="all">All Academy Cohorts & Faculty</option>
                   {availableCourses.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -463,10 +465,12 @@ export const Announcements = () => {
                   Priority Tag
                 </label>
                 <select
+                  required
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                   className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
                 >
+                  <option value="" disabled>Select a priority</option>
                   <option value="Normal">Normal</option>
                   <option value="Urgent">Urgent</option>
                   <option value="Info">Informational</option>

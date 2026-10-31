@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { MAX_UPLOAD_BYTES, readFileAsDataUrl, formatFileSize, detectMaterialType, downloadFile } from '../../utils/files';
 import { useLMS } from '../../context/LMSContext';
 import {
   FolderOpen,
@@ -55,14 +56,8 @@ export const LearningMaterials = () => {
 
   const [editingMaterialId, setEditingMaterialId] = useState(null);
 
-  const [newMaterial, setNewMaterial] = useState({
-    courseId: availableCourses[0]?.id || 'crs-1',
-    unitIdx: 'all',
-    title: '',
-    type: 'pdf',
-    size: '3.8 MB',
-    description: '',
-  });
+  const emptyMaterial = { courseId: '', unitIdx: 'all', title: '', description: '', file: null };
+  const [newMaterial, setNewMaterial] = useState(emptyMaterial);
 
   const isTeacherOrAdmin = currentUser?.role === 'teacher' || currentUser?.role === 'admin';
 
@@ -99,12 +94,40 @@ export const LearningMaterials = () => {
     }
   };
 
+  const handleMaterialFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      addToast('That file is too large. Please upload a file of 7 MB or less.', 'warning');
+      return;
+    }
+    try {
+      const url = await readFileAsDataUrl(file);
+      setNewMaterial((prev) => ({
+        ...prev,
+        file: { name: file.name, size: formatFileSize(file.size), type: detectMaterialType(file), url },
+      }));
+    } catch {
+      addToast('Could not read that file. Please try again.', 'error');
+    }
+  };
+
   const handleCreateOrUpdateMaterial = (e) => {
     e.preventDefault();
     if (!newMaterial.title.trim()) return;
+    if (!newMaterial.file) {
+      addToast('Please upload a PDF, video or image file.', 'warning');
+      return;
+    }
     const courseObj = courses.find((c) => c.id === newMaterial.courseId);
+    const { file, ...rest } = newMaterial;
     const payload = {
-      ...newMaterial,
+      ...rest,
+      type: file.type,
+      size: file.size,
+      fileName: file.name,
+      downloadUrl: file.url,
       title: newMaterial.title.trim(),
       courseTitle: courseObj?.title || 'Studio Course',
       unitIdx: newMaterial.unitIdx !== 'all' ? Number(newMaterial.unitIdx) : undefined,
@@ -116,14 +139,7 @@ export const LearningMaterials = () => {
     }
     setShowUploadModal(false);
     setEditingMaterialId(null);
-    setNewMaterial({
-      courseId: availableCourses[0]?.id || 'crs-1',
-      unitIdx: 'all',
-      title: '',
-      type: 'pdf',
-      size: '3.8 MB',
-      description: '',
-    });
+    setNewMaterial(emptyMaterial);
   };
 
   return (
@@ -279,12 +295,14 @@ export const LearningMaterials = () => {
                         onClick={() => {
                           setEditingMaterialId(mat.id);
                           setNewMaterial({
-                            courseId: mat.courseId || availableCourses[0]?.id || 'crs-1',
+                            courseId: mat.courseId || '',
                             unitIdx: mat.unitIdx !== undefined ? mat.unitIdx : 'all',
                             title: mat.title || '',
-                            type: mat.type || 'pdf',
-                            size: mat.size || '3.8 MB',
                             description: mat.description || '',
+                            file:
+                              mat.downloadUrl && mat.downloadUrl !== '#'
+                                ? { name: mat.fileName || mat.title, size: mat.size, type: mat.type, url: mat.downloadUrl }
+                                : null,
                           });
                           setShowUploadModal(true);
                         }}
@@ -325,7 +343,11 @@ export const LearningMaterials = () => {
                         if (isStudent && markMaterialAsViewed) {
                           markMaterialAsViewed(mat.id);
                         }
-                        addToast(`Downloaded "${mat.title}"`, 'success');
+                        if (downloadFile(mat.downloadUrl, mat.fileName || mat.title)) {
+                          addToast(`Downloaded "${mat.title}"`, 'success');
+                        } else {
+                          addToast('No file has been uploaded for this material yet.', 'warning');
+                        }
                       }}
                       className="px-3.5 py-1.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
                     >
@@ -365,10 +387,12 @@ export const LearningMaterials = () => {
                   Target Course
                 </label>
                 <select
+                  required
                   value={newMaterial.courseId}
                   onChange={(e) => setNewMaterial({ ...newMaterial, courseId: e.target.value, unitIdx: 'all' })}
                   className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 font-semibold"
                 >
+                  <option value="" disabled>Select a course</option>
                   {availableCourses.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.title} ({c.code})
@@ -411,35 +435,36 @@ export const LearningMaterials = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
-                    Resource Type
-                  </label>
-                  <select
-                    value={newMaterial.type}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, type: e.target.value })}
-                    className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
-                  >
-                    <option value="pdf">PDF Document</option>
-                    <option value="slides">Slide Deck</option>
-                    <option value="video">Video Recording</option>
-                    <option value="code">Source Code / Repo</option>
-                    <option value="image">Diagram / Illustration</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
-                    Simulated Size
-                  </label>
+              <div>
+                <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
+                  File (PDF, video or image) <span className="text-red-500">*</span>
+                </label>
+                <label className="border-2 border-dashed border-charcoal/20 hover:border-forest/50 rounded-2xl p-5 text-center bg-cream/20 hover:bg-cream/40 transition-all cursor-pointer block">
                   <input
-                    type="text"
-                    value={newMaterial.size}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, size: e.target.value })}
-                    className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30 font-mono"
+                    type="file"
+                    accept=".pdf,application/pdf,video/*,image/*"
+                    onChange={handleMaterialFileChange}
+                    className="hidden"
                   />
-                </div>
+                  <p className="text-xs font-bold text-charcoal">Click to choose a file to upload</p>
+                  <p className="text-[11px] text-charcoal-muted mt-1">PDF, video or image, up to 7 MB</p>
+                </label>
+                {newMaterial.file && (
+                  <div className="mt-2.5 flex items-center justify-between p-3 rounded-xl bg-forest/5 border border-forest/20">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-charcoal truncate">{newMaterial.file.name}</p>
+                      <p className="text-[10px] text-charcoal-muted">{newMaterial.file.size}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNewMaterial((prev) => ({ ...prev, file: null }))}
+                      className="p-1 text-charcoal-muted hover:text-red-600 cursor-pointer"
+                      title="Remove file"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>

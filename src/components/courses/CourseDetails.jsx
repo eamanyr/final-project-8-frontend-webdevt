@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { MAX_UPLOAD_BYTES, readFileAsDataUrl, formatFileSize, detectMaterialType, downloadFile } from '../../utils/files';
 import { useLMS } from '../../context/LMSContext';
 import { buildCourseUnitsWithItems } from '../../data/courseCurriculum';
 import {
@@ -147,15 +148,11 @@ export const CourseDetails = () => {
     title: '',
     description: '',
     dueDate: '',
-    dueTime: '11:59 PM',
-    maxScore: 100,
-    priority: 'Medium',
+    dueTime: '',
+    maxScore: '',
+    priority: '',
     submissionTypes: ['pdf', 'link'],
-    rubric: [
-      { criteria: 'Technical Execution & Precision', points: 40 },
-      { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
-      { criteria: 'Documentation & Presentation', points: 25 },
-    ],
+    rubric: [],
   });
 
   // Modal states for materials
@@ -164,10 +161,8 @@ export const CourseDetails = () => {
   const [selectedMaterialUnit, setSelectedMaterialUnit] = useState('all');
   const [materialFormData, setMaterialFormData] = useState({
     title: '',
-    type: 'pdf',
-    size: '3.8 MB',
-    downloadUrl: '',
     description: '',
+    file: null, // { name, size, type, url } once a file is chosen
   });
 
   // Drag and drop state for rearranging lessons, materials, and assignments
@@ -431,21 +426,15 @@ export const CourseDetails = () => {
     const targetIdx = Number(unitIdx) || 0;
     setSelectedUnitIdxForAssignment(targetIdx);
     setEditingAssignmentId(null);
-    const unitObj = course.syllabus?.[targetIdx];
-    const unitTitle = unitObj?.title || `Unit ${targetIdx + 1}`;
     setAssignmentFormData({
       title: '',
-      description: `Complete the studio assessment for ${unitTitle}. Follow the brief, apply core techniques, and upload your deliverable.`,
-      dueDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-      dueTime: '11:59 PM',
-      maxScore: 100,
-      priority: 'Medium',
+      description: '',
+      dueDate: '',
+      dueTime: '',
+      maxScore: '',
+      priority: '',
       submissionTypes: ['pdf', 'link'],
-      rubric: [
-        { criteria: 'Technical Execution & Precision', points: 40 },
-        { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
-        { criteria: 'Documentation & Presentation', points: 25 },
-      ],
+      rubric: [],
     });
     setIsAssignmentModalOpen(true);
   };
@@ -458,16 +447,12 @@ export const CourseDetails = () => {
     setAssignmentFormData({
       title: asg.title || '',
       description: asg.description || '',
-      dueDate: asg.dueDate || new Date().toISOString().slice(0, 10),
-      dueTime: asg.dueTime || '11:59 PM',
-      maxScore: asg.maxScore || 100,
-      priority: asg.priority || 'Medium',
+      dueDate: asg.dueDate || '',
+      dueTime: asg.dueTime || '',
+      maxScore: asg.maxScore || '',
+      priority: asg.priority || '',
       submissionTypes: asg.submissionTypes || ['pdf', 'link'],
-      rubric: asg.rubric && asg.rubric.length ? asg.rubric : [
-        { criteria: 'Technical Execution & Precision', points: 40 },
-        { criteria: 'Concept Originality & Aesthetic Flow', points: 35 },
-        { criteria: 'Documentation & Presentation', points: 25 },
-      ],
+      rubric: asg.rubric && asg.rubric.length ? asg.rubric : [],
     });
     setIsAssignmentModalOpen(true);
   };
@@ -480,18 +465,22 @@ export const CourseDetails = () => {
     }
 
     const totalRubricPts = assignmentFormData.rubric.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
-    const finalMaxScore = totalRubricPts > 0 ? totalRubricPts : parseInt(assignmentFormData.maxScore) || 100;
+    const finalMaxScore = totalRubricPts > 0 ? totalRubricPts : parseInt(assignmentFormData.maxScore) || 0;
+    if (!finalMaxScore) {
+      addToast('Please enter the max score or add rubric criteria with points.', 'warning');
+      return;
+    }
 
     const payload = {
       courseId: course.id,
       courseName: course.title,
       unitIdx: Number(selectedUnitIdxForAssignment),
       title: assignmentFormData.title.trim(),
-      description: assignmentFormData.description.trim() || 'Complete the assigned task and submit your work.',
+      description: assignmentFormData.description.trim(),
       dueDate: assignmentFormData.dueDate,
-      dueTime: assignmentFormData.dueTime || '11:59 PM',
+      dueTime: assignmentFormData.dueTime,
       maxScore: finalMaxScore,
-      priority: assignmentFormData.priority || 'Medium',
+      priority: assignmentFormData.priority,
       submissionTypes: assignmentFormData.submissionTypes || ['pdf', 'link'],
       rubric: assignmentFormData.rubric,
     };
@@ -511,13 +500,7 @@ export const CourseDetails = () => {
   const handleOpenAddMaterialModal = (unitIdx = 'all') => {
     setSelectedMaterialUnit(unitIdx);
     setEditingMaterialId(null);
-    setMaterialFormData({
-      title: '',
-      type: 'pdf',
-      size: '3.8 MB',
-      downloadUrl: '',
-      description: '',
-    });
+    setMaterialFormData({ title: '', description: '', file: null });
     setIsUploadMaterialModalOpen(true);
   };
 
@@ -526,12 +509,32 @@ export const CourseDetails = () => {
     setSelectedMaterialUnit(mat.unitIdx !== undefined ? mat.unitIdx : 'all');
     setMaterialFormData({
       title: mat.title || '',
-      type: mat.type || 'pdf',
-      size: mat.size || '3.8 MB',
-      downloadUrl: mat.downloadUrl || '',
       description: mat.description || '',
+      file:
+        mat.downloadUrl && mat.downloadUrl !== '#'
+          ? { name: mat.fileName || mat.title, size: mat.size, type: mat.type, url: mat.downloadUrl }
+          : null,
     });
     setIsUploadMaterialModalOpen(true);
+  };
+
+  const handleMaterialFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      addToast('That file is too large. Please upload a file of 7 MB or less.', 'warning');
+      return;
+    }
+    try {
+      const url = await readFileAsDataUrl(file);
+      setMaterialFormData((prev) => ({
+        ...prev,
+        file: { name: file.name, size: formatFileSize(file.size), type: detectMaterialType(file), url },
+      }));
+    } catch {
+      addToast('Could not read that file. Please try again.', 'error');
+    }
   };
 
   const handleMaterialSubmit = (e) => {
@@ -540,17 +543,20 @@ export const CourseDetails = () => {
       addToast('Please enter a material title.', 'warning');
       return;
     }
+    if (!materialFormData.file) {
+      addToast('Please upload a PDF, video or image file.', 'warning');
+      return;
+    }
 
     const payload = {
       courseId: course.id,
       courseTitle: course.title,
       title: materialFormData.title.trim(),
-      type: materialFormData.type,
-      size: materialFormData.size.trim() || '4.5 MB',
-      downloadUrl: materialFormData.downloadUrl.trim() || '#',
-      description:
-        materialFormData.description.trim() ||
-        `Study resource and lecture assets uploaded for ${course.title}.`,
+      type: materialFormData.file.type,
+      size: materialFormData.file.size,
+      fileName: materialFormData.file.name,
+      downloadUrl: materialFormData.file.url,
+      description: materialFormData.description.trim(),
       unitIdx:
         selectedMaterialUnit !== 'all' ? Number(selectedMaterialUnit) : undefined,
     };
@@ -1797,7 +1803,9 @@ export const CourseDetails = () => {
                           type="button"
                           onClick={() => {
                             markMaterialAsViewed(mat.id);
-                            addToast(`Downloading ${mat.title}.${mat.type || 'pdf'}`, 'success');
+                            if (!downloadFile(mat.downloadUrl, mat.fileName || mat.title)) {
+                              addToast('No file has been uploaded for this material yet.', 'warning');
+                            }
                           }}
                           className="px-3.5 py-1.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                         >
@@ -3181,58 +3189,38 @@ export const CourseDetails = () => {
                 />
               </div>
 
-              {/* Type and Size */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1.5">
-                    Resource Type
-                  </label>
-                  <select
-                    value={materialFormData.type}
-                    onChange={(e) =>
-                      setMaterialFormData({ ...materialFormData, type: e.target.value })
-                    }
-                    className="w-full px-3 py-2.5 rounded-xl border border-charcoal/20 text-xs text-charcoal focus:outline-hidden focus:border-forest focus:ring-1 focus:ring-forest bg-cream/30 font-semibold"
-                  >
-                    <option value="pdf">PDF Document</option>
-                    <option value="slides">Slide Deck / Keynote</option>
-                    <option value="video">Video Recording</option>
-                    <option value="code">Source Code / Repo</option>
-                    <option value="image">Diagram / Illustration</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1.5">
-                    Simulated Size
-                  </label>
-                  <input
-                    type="text"
-                    value={materialFormData.size}
-                    onChange={(e) =>
-                      setMaterialFormData({ ...materialFormData, size: e.target.value })
-                    }
-                    className="w-full px-3 py-2.5 rounded-xl border border-charcoal/20 text-xs text-charcoal focus:outline-hidden focus:border-forest focus:ring-1 focus:ring-forest bg-cream/30 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Download / Resource Link */}
+              {/* File Upload */}
               <div>
                 <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1.5">
-                  Download / Access URL (Optional)
+                  File (PDF, video or image) <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="https://cacheup.edu/materials/... or # for local"
-                  value={materialFormData.downloadUrl}
-                  onChange={(e) =>
-                    setMaterialFormData({
-                      ...materialFormData,
-                      downloadUrl: e.target.value,
-                    })
-                  }
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal/20 text-xs text-charcoal focus:outline-hidden focus:border-forest focus:ring-1 focus:ring-forest bg-cream/30"
-                />
+                <label className="border-2 border-dashed border-charcoal/20 hover:border-forest/50 rounded-2xl p-5 text-center bg-cream/20 hover:bg-cream/40 transition-all cursor-pointer block">
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf,video/*,image/*"
+                    onChange={handleMaterialFileChange}
+                    className="hidden"
+                  />
+                  <UploadCloud className="w-8 h-8 text-forest mx-auto mb-1.5" />
+                  <p className="text-xs font-bold text-charcoal">Click to choose a file to upload</p>
+                  <p className="text-[11px] text-charcoal-muted mt-1">PDF, video or image, up to 7 MB</p>
+                </label>
+                {materialFormData.file && (
+                  <div className="mt-2.5 flex items-center justify-between p-3 rounded-xl bg-forest/5 border border-forest/20">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-charcoal truncate">{materialFormData.file.name}</p>
+                      <p className="text-[10px] text-charcoal-muted">{materialFormData.file.size}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMaterialFormData((prev) => ({ ...prev, file: null }))}
+                      className="p-1 text-charcoal-muted hover:text-red-600 cursor-pointer"
+                      title="Remove file"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Description / Study Guidelines */}
@@ -3353,6 +3341,7 @@ export const CourseDetails = () => {
                   </label>
                   <input
                     type="date"
+                    required
                     value={assignmentFormData.dueDate}
                     onChange={(e) =>
                       setAssignmentFormData({ ...assignmentFormData, dueDate: e.target.value })
@@ -3366,7 +3355,8 @@ export const CourseDetails = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="11:59 PM"
+                    required
+                    placeholder="e.g. 11:59 PM"
                     value={assignmentFormData.dueTime}
                     onChange={(e) =>
                       setAssignmentFormData({ ...assignmentFormData, dueTime: e.target.value })
@@ -3386,6 +3376,7 @@ export const CourseDetails = () => {
                     type="number"
                     min="10"
                     max="1000"
+                    required={(assignmentFormData.rubric || []).length === 0}
                     value={assignmentFormData.maxScore}
                     onChange={(e) =>
                       setAssignmentFormData({
@@ -3401,12 +3392,14 @@ export const CourseDetails = () => {
                     Priority Level
                   </label>
                   <select
+                    required
                     value={assignmentFormData.priority}
                     onChange={(e) =>
                       setAssignmentFormData({ ...assignmentFormData, priority: e.target.value })
                     }
                     className="w-full px-3 py-2.5 rounded-xl border border-charcoal/20 text-xs text-charcoal focus:outline-hidden focus:border-forest focus:ring-1 focus:ring-forest bg-cream/30 font-semibold"
                   >
+                    <option value="" disabled>Select priority</option>
                     <option value="High">High Priority</option>
                     <option value="Medium">Medium Priority</option>
                     <option value="Low">Low Priority</option>
@@ -3450,7 +3443,7 @@ export const CourseDetails = () => {
                       setAssignmentFormData((prev) => {
                         const updated = [
                           ...(prev.rubric || []),
-                          { criteria: 'New Evaluation Criterion', points: 10 },
+                          { criteria: '', points: '' },
                         ];
                         const sum = updated.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
                         return { ...prev, rubric: updated, maxScore: sum };
@@ -3504,7 +3497,7 @@ export const CourseDetails = () => {
                         className="w-16 bg-white border border-charcoal/15 rounded-lg px-2 py-1.5 text-xs text-charcoal text-center font-bold font-mono focus:outline-hidden focus:border-forest"
                       />
                       <span className="text-[11px] text-charcoal-muted">Pts</span>
-                      {(assignmentFormData.rubric || []).length > 1 && (
+                      {(assignmentFormData.rubric || []).length > 0 && (
                         <button
                           type="button"
                           onClick={() => {
