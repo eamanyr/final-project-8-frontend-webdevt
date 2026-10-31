@@ -75,7 +75,7 @@ export const LearningMaterials = () => {
     if (
       search &&
       !m.title.toLowerCase().includes(search.toLowerCase()) &&
-      !m.courseTitle.toLowerCase().includes(search.toLowerCase())
+      !(m.courseTitle || m.courseName || '').toLowerCase().includes(search.toLowerCase())
     ) {
       return false;
     }
