@@ -3,7 +3,7 @@ import { useLMS } from '../../context/LMSContext';
 import { Sparkles, ArrowRight, Lock, Mail, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 export const Login = () => {
-  const { login, setActiveTab, switchDemoUser } = useLMS();
+  const { login, setActiveTab } = useLMS();
   const [email, setEmail] = useState('stella@cacheup.edu');
   const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
@@ -15,22 +15,6 @@ export const Login = () => {
       await login(email, password);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleQuickDemo = (role) => {
-    if (role === 'student') {
-      setEmail('stella@cacheup.edu');
-      setPassword('password123');
-      switchDemoUser('student');
-    } else if (role === 'teacher') {
-      setEmail('alicia@cacheup.edu');
-      setPassword('password123');
-      switchDemoUser('teacher');
-    } else if (role === 'admin') {
-      setEmail('admin@cacheup.edu');
-      setPassword('password123');
-      switchDemoUser('admin');
     }
   };
 
@@ -109,39 +93,6 @@ export const Login = () => {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        {/* 1-Click Fast Demo Logins */}
-        <div className="mt-6 pt-5 border-t border-charcoal/10">
-          <p className="text-[11px] font-bold text-charcoal-muted uppercase tracking-wider text-center mb-3">
-            One-Click Instant Demo Profiles
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('student')}
-              className="p-2.5 rounded-xl border border-charcoal/15 bg-cream/50 hover:bg-cream text-center text-xs font-semibold text-charcoal transition-all hover:scale-[1.02]"
-            >
-              <span className="block text-forest font-bold">Student</span>
-              <span className="text-[10px] text-charcoal-muted">Stella</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('teacher')}
-              className="p-2.5 rounded-xl border border-charcoal/15 bg-cream/50 hover:bg-cream text-center text-xs font-semibold text-charcoal transition-all hover:scale-[1.02]"
-            >
-              <span className="block text-forest font-bold">Teacher</span>
-              <span className="text-[10px] text-charcoal-muted">Prof. Alicia</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('admin')}
-              className="p-2.5 rounded-xl border border-charcoal/15 bg-cream/50 hover:bg-cream text-center text-xs font-semibold text-charcoal transition-all hover:scale-[1.02]"
-            >
-              <span className="block text-forest font-bold">Admin</span>
-              <span className="text-[10px] text-charcoal-muted">Marcus</span>
-            </button>
-          </div>
-        </div>
 
         {/* Register CTA */}
         <div className="mt-6 text-center text-xs text-charcoal-muted">

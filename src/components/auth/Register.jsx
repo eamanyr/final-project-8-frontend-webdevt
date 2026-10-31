@@ -3,7 +3,6 @@ import { useLMS } from '../../context/LMSContext';
 import { Sparkles, ArrowLeft, UserPlus, Clock } from 'lucide-react';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const PHONE_REGEX = /^\+?\d{10,13}$/;
 
 const validate = (data) => {
   const errors = {};
@@ -22,12 +21,6 @@ const validate = (data) => {
   if (!data.confirmPassword) errors.confirmPassword = 'Please confirm your password.';
   else if (data.password !== data.confirmPassword) errors.confirmPassword = 'Passwords do not match.';
 
-  // Phone is optional, but if filled in it must look like a real number.
-  const phone = data.phone.replace(/[\s\-().]/g, '');
-  if (phone && !PHONE_REGEX.test(phone)) {
-    errors.phone = 'Enter a valid number, e.g. 0917 123 4567 or +63 917 123 4567.';
-  }
-
   return errors;
 };
 
@@ -35,7 +28,7 @@ const FieldError = ({ message }) =>
   message ? <p className="mt-1 text-[11px] text-red-600">{message}</p> : null;
 
 export const Register = () => {
-  const { registerStudent, setActiveTab, switchDemoUser } = useLMS();
+  const { registerStudent, setActiveTab } = useLMS();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -43,7 +36,6 @@ export const Register = () => {
     password: '',
     confirmPassword: '',
     department: 'School of Design & Creative Arts',
-    phone: '',
     bio: '',
     notes: '',
   });
@@ -110,25 +102,6 @@ export const Register = () => {
               Thank you, <strong className="text-charcoal">{registeredUser.name}</strong>! Your application has been logged with ID{' '}
               <code className="text-forest font-semibold">{registeredUser.studentId}</code>. In accordance with CacheUp policies, an Administrator must verify and approve your registration before you can log in.
             </p>
-
-            {/* Quick Demo shortcut to test approval */}
-            <div className="mt-6 p-4 rounded-2xl bg-cream border border-gold/30 text-left">
-              <p className="text-xs font-bold text-charcoal flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-gold-dark" />
-                <span>Test Approval as Admin:</span>
-              </p>
-              <p className="text-[11px] text-charcoal-muted mt-1 leading-snug">
-                You can switch to Administrator (Marcus Vance) right now to approve this pending applicant!
-              </p>
-              <button
-                onClick={() => {
-                  switchDemoUser('admin', 'approvals');
-                }}
-                className="mt-3 w-full py-2 px-3 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-all text-center"
-              >
-                Log In as Admin to Review & Approve
-              </button>
-            </div>
 
             <div className="mt-6">
               <button
@@ -206,7 +179,7 @@ export const Register = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
               <div>
                 <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
                   Department / Interest
@@ -223,22 +196,6 @@ export const Register = () => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  maxLength={20}
-                  placeholder="e.g. 0917 123 4567"
-                  value={formData.phone}
-                  onChange={(e) => setField('phone', e.target.value)}
-                  aria-invalid={!!errors.phone}
-                  className={inputClass('phone')}
-                />
-                <FieldError message={errors.phone} />
-              </div>
             </div>
 
             <div>
