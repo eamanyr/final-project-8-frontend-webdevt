@@ -74,6 +74,7 @@ export const CourseDetails = () => {
     markMaterialAsViewed,
     setSelectedLessonId,
     setActiveTab,
+    deleteCourse,
     toggleEnrollCourse,
     setSelectedAssignmentId,
     quizzes,
@@ -89,6 +90,7 @@ export const CourseDetails = () => {
 
   const [activeTab, setActiveSection] = useState(courseActiveTab || 'syllabus');
   const [selectedGradeStudentId, setSelectedGradeStudentId] = useState('');
+  const [showDeleteCourse, setShowDeleteCourse] = useState(false);
 
   React.useEffect(() => {
     if (courseActiveTab) {
@@ -796,6 +798,17 @@ export const CourseDetails = () => {
           >
             <Edit className="w-3.5 h-3.5" />
             <span>Edit Course Details</span>
+          </button>
+        )}
+
+        {canManageCourse && (
+          <button
+            type="button"
+            onClick={() => setShowDeleteCourse(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-200 bg-white text-xs font-bold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete Course</span>
           </button>
         )}
       </div>
@@ -3574,6 +3587,44 @@ export const CourseDetails = () => {
           )}
           onClose={() => setActiveTakingQuiz(null)}
         />
+      )}
+      {showDeleteCourse && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/50 p-4"
+          onClick={() => setShowDeleteCourse(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 max-w-md w-full shadow-xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-bold font-heading text-charcoal">Delete this course?</h3>
+            <p className="text-xs text-charcoal-muted leading-relaxed">
+              <strong className="text-charcoal">{course.title}</strong> and all of its assignments, quizzes,
+              materials and submissions will be permanently removed, and students will be un-enrolled.
+              This can&apos;t be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteCourse(false)}
+                className="px-4 py-2 rounded-xl border border-charcoal/20 text-xs font-bold text-charcoal hover:bg-cream cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteCourse(course.id);
+                  setShowDeleteCourse(false);
+                  setActiveTab('courses');
+                }}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 cursor-pointer"
+              >
+                Delete Course
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

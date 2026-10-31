@@ -1006,31 +1006,29 @@ export const LMSProvider = ({ children }) => {
 
   // Course actions
   const addCourse = (courseData) => {
+    const instructor =
+      users.find((u) => u.id === courseData.instructorId) || currentUser;
     const newCourse = {
       id: `crs-${Date.now()}`,
-      code: courseData.code || `CU-${Math.floor(100 + Math.random() * 900)}`,
+      code: courseData.code,
       title: courseData.title,
-      category: courseData.category || 'General',
-      instructorId: currentUser?.id || 'usr-3',
-      instructorName: currentUser?.name || 'Prof. Alicia Mayer',
-      instructorAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
-      level: courseData.level || 'Beginner level',
-      duration: courseData.duration || '8 Weeks',
-      totalLessons: parseInt(courseData.totalLessons) || 16,
+      category: courseData.category,
+      instructorId: instructor?.id,
+      instructorName: instructor?.name,
+      instructorAvatar: instructor?.avatar,
+      level: courseData.level,
+      duration: courseData.duration,
+      totalLessons: 0,
       completedLessons: 0,
       progress: 0,
-      studentsCount: 1,
+      studentsCount: 0,
       color: courseData.color || '#1e3f33',
       badge: 'New Course',
       thumbnail: resolveCourseCover(courseData.thumbnail),
-      description: courseData.description || 'Modern learning module on CacheUp.',
-      schedule: courseData.schedule || 'Flexible Online Sessions',
-      room: courseData.room || 'Virtual Lab 1',
-      syllabus: courseData.syllabus || [
-        { unit: 'Unit 1', title: 'Course Orientation & Fundamentals', lessons: 4 },
-        { unit: 'Unit 2', title: 'Hands-on Exercises & Studio Critique', lessons: 6 },
-        { unit: 'Unit 3', title: 'Capstone Project & Final Assessment', lessons: 6 }
-      ]
+      description: courseData.description,
+      schedule: courseData.schedule,
+      room: courseData.room,
+      syllabus: courseData.syllabus || [],
     };
     api.courses.create(newCourse).catch((e) => console.warn(e));
     setCourses((prev) => [newCourse, ...prev]);
@@ -1049,6 +1047,18 @@ export const LMSProvider = ({ children }) => {
   const deleteCourse = (courseId) => {
     api.courses.delete(courseId).catch((e) => console.warn(e));
     setCourses((prev) => prev.filter((c) => c.id !== courseId));
+    // Drop everything that belonged to the course so nothing is left orphaned.
+    setAssignments((prev) => prev.filter((a) => a.courseId !== courseId));
+    setQuizzes((prev) => prev.filter((q) => q.courseId !== courseId));
+    setMaterials((prev) => prev.filter((m) => m.courseId !== courseId));
+    setSubmissions((prev) => prev.filter((s) => s.courseId !== courseId));
+    setQuizSubmissions((prev) => prev.filter((s) => s.courseId !== courseId));
+    const unenroll = (u) =>
+      u.enrolledCourseIds?.includes(courseId)
+        ? { ...u, enrolledCourseIds: u.enrolledCourseIds.filter((id) => id !== courseId) }
+        : u;
+    setUsers((prev) => prev.map(unenroll));
+    setCurrentUser((prev) => (prev ? unenroll(prev) : prev));
     addToast('Course deleted.', 'info');
   };
 
