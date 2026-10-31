@@ -4,7 +4,6 @@ import { StatCard } from '../common/StatCard';
 import { Badge } from '../common/Badge';
 import {
   TrendingUp,
-  Award,
   BookOpen,
   Clock,
   Flame,
@@ -15,7 +14,6 @@ import {
   ChevronRight,
   Users,
   FileText,
-  Star,
   Search
 } from 'lucide-react';
 import { handleCoverError, resolveCourseCover } from '../../data/coverImages';
@@ -183,19 +181,6 @@ export const StudentDashboard = () => {
           ? (currentUser?.gpa || '3.80')
           : (currentUser?.gpa && currentUser.gpa !== '3.80' && currentUser.gpa !== '3.88' ? currentUser.gpa : 'N/A');
 
-        const userPoints = isStella
-          ? (currentUser?.points || 1450)
-          : (currentUser?.points && currentUser.points !== 1000 ? currentUser.points : (hasEvaluatedItems ? totalEarnedPoints : 0));
-
-        const getLevelInfo = (pts) => {
-          if (pts >= 1200) return { level: 'Level 4', rank: 'Top 5% in cohort' };
-          if (pts >= 700) return { level: 'Level 3', rank: 'Top 20% in cohort' };
-          if (pts >= 300) return { level: 'Level 2', rank: 'Active Scholar' };
-          if (pts > 0) return { level: 'Level 1', rank: 'Getting Started' };
-          return { level: 'Level 1', rank: '0 points earned' };
-        };
-        const { level: userLevel, rank: userRank } = getLevelInfo(userPoints);
-
         const userStreakDays = isStella
           ? (currentUser?.streakDays || 14)
           : (currentUser?.streakDays && currentUser.streakDays !== 1 ? currentUser.streakDays : 0);
@@ -205,7 +190,7 @@ export const StudentDashboard = () => {
           : (currentUser?.studyHours && currentUser.studyHours !== 10 ? currentUser.studyHours : 0);
 
         return (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <StatCard
               title="Overall Progress"
               value={`${overallProgress}%`}
@@ -218,16 +203,6 @@ export const StudentDashboard = () => {
               trend={overallProgress > 0 ? `+${overallProgress}%` : '0%'}
               trendPositive={overallProgress > 0}
               colorScheme="forest"
-              onClick={() => setActiveTab('progress')}
-            />
-            <StatCard
-              title="Academy Points"
-              value={`${userPoints}`}
-              subtitle={userRank}
-              icon={Award}
-              trend={userLevel}
-              trendPositive={userPoints > 0}
-              colorScheme="gold"
               onClick={() => setActiveTab('progress')}
             />
             <StatCard
@@ -370,14 +345,6 @@ export const StudentDashboard = () => {
                       <div className="absolute top-3 left-3">
                         <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-white/95 text-charcoal shadow-sm backdrop-blur-xs">
                           {course.level}
-                        </span>
-                      </div>
-
-                      {/* Rating Badge */}
-                      <div className="absolute top-3 right-3">
-                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-charcoal/80 text-gold flex items-center gap-1 backdrop-blur-xs shadow-sm">
-                          <Star className="w-3 h-3 fill-gold" />
-                          <span>{course.rating}</span>
                         </span>
                       </div>
 

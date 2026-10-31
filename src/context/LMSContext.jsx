@@ -13,7 +13,6 @@ import {
   INITIAL_USER_SCHEDULES,
   INITIAL_REMINDERS,
   INITIAL_MEETINGS,
-  INITIAL_COURSE_RATINGS,
   INITIAL_QUIZZES,
   INITIAL_QUIZ_SUBMISSIONS,
 } from '../data/mockData';
@@ -294,23 +293,6 @@ export const LMSProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('cacheup_course_meetings', JSON.stringify(courseMeetings));
   }, [courseMeetings]);
-
-  const [courseRatings, setCourseRatings] = useState(() => {
-    const saved = localStorage.getItem('cacheup_course_ratings');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return { ...INITIAL_COURSE_RATINGS, ...parsed };
-      } catch {
-        return INITIAL_COURSE_RATINGS;
-      }
-    }
-    return INITIAL_COURSE_RATINGS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('cacheup_course_ratings', JSON.stringify(courseRatings));
-  }, [courseRatings]);
 
   // Navigation and UI state
   // CHANGED: the active page now comes from the URL
@@ -1038,7 +1020,6 @@ export const LMSProvider = ({ children }) => {
       completedLessons: 0,
       progress: 0,
       studentsCount: 1,
-      rating: 5.0,
       color: courseData.color || '#1e3f33',
       badge: 'New Course',
       thumbnail: resolveCourseCover(courseData.thumbnail),
@@ -2030,84 +2011,6 @@ export const LMSProvider = ({ children }) => {
     addToast('Live meeting cancelled and removed.', 'info');
   };
 
-  const rateCourse = (courseId, { rating, review, tags }) => {
-    const student = currentUser || { id: 'usr-1', name: 'Stella Walton' };
-    const numRating = Number(rating) || 5;
-    const newRating = {
-      id: `rat-${Date.now()}`,
-      courseId,
-      studentId: student.id,
-      studentName: student.name,
-      studentAvatar:
-        student.avatar ||
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-      rating: numRating,
-      review: (review || '').trim(),
-      tags: tags || [],
-      date: new Date().toLocaleDateString('en-US', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      }),
-    };
-
-    let updatedRatingsForCourse = [];
-    setCourseRatings((prev) => {
-      const existing = prev[courseId] || [];
-      const filtered = existing.filter((r) => r.studentId !== student.id);
-      updatedRatingsForCourse = [newRating, ...filtered];
-      return {
-        ...prev,
-        [courseId]: updatedRatingsForCourse,
-      };
-    });
-
-    // Mark course as completed for this student
-    if (student.id) {
-      setUserCompletedCourses((prev) => {
-        const userList = prev[student.id] || [];
-        if (userList.includes(courseId)) return prev;
-        return { ...prev, [student.id]: [...userList, courseId] };
-      });
-    }
-
-    // Recalculate average rating on course
-    setCourses((prevCourses) =>
-      prevCourses.map((c) => {
-        if (c.id === courseId) {
-          const allRatings = updatedRatingsForCourse.length
-            ? updatedRatingsForCourse
-            : [newRating];
-          const avg = (
-            allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length
-          ).toFixed(1);
-
-          return {
-            ...c,
-            rating: parseFloat(avg),
-          };
-        }
-        return c;
-      })
-    );
-
-    // Reward student with 50 XP points
-    if (student.id) {
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === student.id ? { ...u, points: (u.points || 0) + 50 } : u
-        )
-      );
-      if (currentUser?.id === student.id) {
-        setCurrentUser((prev) =>
-          prev ? { ...prev, points: (prev.points || 0) + 50 } : prev
-        );
-      }
-    }
-
-    addToast(`⭐ Thank you! Your review for this course was saved (+50 XP).`, 'success');
-  };
-
   const markCourseComplete = (courseId) => {
     if (!currentUser?.id) return;
     setUserCompletedCourses((prev) => {
@@ -2164,7 +2067,6 @@ export const LMSProvider = ({ children }) => {
     setUserSchedules(INITIAL_USER_SCHEDULES);
     setReminders(INITIAL_REMINDERS);
     setCourseMeetings(INITIAL_MEETINGS);
-    setCourseRatings(INITIAL_COURSE_RATINGS);
     setCustomLessons({});
     setActiveTab('dashboard');
     addToast('System reset to original fresh demo state!', 'info');
@@ -2242,8 +2144,6 @@ export const LMSProvider = ({ children }) => {
         courseMeetings,
         saveCourseMeeting,
         removeCourseMeeting,
-        courseRatings,
-        rateCourse,
         markCourseComplete,
 
         // Course management
