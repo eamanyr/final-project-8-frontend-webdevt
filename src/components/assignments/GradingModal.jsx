@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLMS } from '../../context/LMSContext';
 import {
   X,
@@ -65,6 +65,59 @@ export const GradingModal = ({ submission, onClose }) => {
   const [pdfPage, setPdfPage] = useState(1);
   const totalPdfPages = 3;
   const [zoomLevel, setZoomLevel] = useState(100);
+
+  // Real uploaded file: work out how to show it and give the viewer a blob URL (data: URLs are
+  // unreliable inside iframes and for large files).
+  const fileExt = (submission.fileName || '').split('.').pop().toLowerCase();
+  const dataMime = /^data:([^;,]+)/.exec(submission.fileUrl || '')?.[1] || '';
+  const fileKind =
+    fileExt === 'pdf' || dataMime === 'application/pdf'
+      ? 'pdf'
+      : /^(png|jpe?g|gif|webp|svg)$/.test(fileExt) || dataMime.startsWith('image/')
+      ? 'image'
+      : fileExt === 'txt' || dataMime === 'text/plain'
+      ? 'text'
+      : 'other';
+  const viewMime =
+    fileKind === 'pdf' ? 'application/pdf' : fileKind === 'text' ? 'text/plain' : dataMime;
+  const [blobUrl, setBlobUrl] = useState('');
+  useEffect(() => {
+    const url = submission.fileUrl;
+    if (!url) return undefined;
+    if (!url.startsWith('data:')) {
+      setBlobUrl(url);
+      return undefined;
+    }
+    let cancelled = false;
+    let created = '';
+    fetch(url)
+      .then((r) => r.blob())
+      .then((b) => {
+        if (cancelled) return;
+        created = URL.createObjectURL(viewMime ? new Blob([b], { type: viewMime }) : b);
+        setBlobUrl(created);
+      })
+      .catch(() => {
+        if (!cancelled) setBlobUrl('');
+      });
+    return () => {
+      cancelled = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [submission.fileUrl, viewMime]);
+
+  const handleDownload = () => {
+    if (!submission.fileUrl) {
+      addToast('This submission has no downloadable file attached.', 'warning');
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = blobUrl || submission.fileUrl;
+    a.download = submission.fileName || 'submission';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
 
   const isGraded = submission.status === 'Graded';
 
@@ -193,7 +246,7 @@ export const GradingModal = ({ submission, onClose }) => {
                 {submission.fileName && (
                   <button
                     type="button"
-                    onClick={() => addToast(`Downloading deliverable: ${submission.fileName}`, 'success')}
+                    onClick={handleDownload}
                     className="ml-1 px-2.5 py-1 rounded-lg bg-forest text-cream text-[11px] font-bold hover:bg-forest-light transition-colors flex items-center gap-1 cursor-pointer"
                     title="Download File"
                   >
@@ -206,26 +259,45 @@ export const GradingModal = ({ submission, onClose }) => {
 
             {/* Document / File Preview Canvas */}
             <div className="p-4 sm:p-5 flex-1 flex flex-col items-center justify-start overflow-y-auto">
-              {/* IF LOCAL / CUSTOM FILE URL OR IMAGE */}
-              {submission.fileUrl && isImageFile ? (
-                <div
-                  className="w-full bg-white rounded-2xl border border-charcoal/10 p-2 shadow-xs transition-transform duration-200"
-                  style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
-                >
-                  <img
-                    src={submission.fileUrl}
-                    alt={submission.fileName}
-                    className="w-full max-h-[480px] object-contain rounded-xl"
-                  />
-                </div>
-              ) : submission.fileUrl && submission.fileUrl.endsWith('.pdf') ? (
-                <div className="w-full h-96 bg-white rounded-2xl border border-charcoal/10 overflow-hidden shadow-xs">
-                  <iframe
-                    src={submission.fileUrl}
-                    title={submission.fileName}
-                    className="w-full h-full border-none"
-                  />
-                </div>
+              {/* REAL UPLOADED FILE */}
+              {submission.fileUrl ? (
+                !blobUrl ? (
+                  <p className="text-xs text-charcoal-muted py-10">Loading file…</p>
+                ) : fileKind === 'image' ? (
+                  <div
+                    className="w-full bg-white rounded-2xl border border-charcoal/10 p-2 shadow-xs transition-transform duration-200"
+                    style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
+                  >
+                    <img
+                      src={blobUrl}
+                      alt={submission.fileName}
+                      className="w-full max-h-[480px] object-contain rounded-xl"
+                    />
+                  </div>
+                ) : fileKind === 'pdf' || fileKind === 'text' ? (
+                  <div className="w-full h-[28rem] bg-white rounded-2xl border border-charcoal/10 overflow-hidden shadow-xs">
+                    <iframe src={blobUrl} title={submission.fileName} className="w-full h-full border-none" />
+                  </div>
+                ) : (
+                  <div className="w-full max-w-lg bg-white rounded-2xl border border-charcoal/10 p-6 shadow-xs text-center space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-forest/10 text-forest flex items-center justify-center mx-auto">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-xs font-bold text-charcoal break-all">{submission.fileName}</h4>
+                    <p className="text-[11px] text-charcoal-muted">
+                      {submission.fileSize ? `${submission.fileSize} • ` : ''}
+                      This file type can&apos;t be previewed in the browser. Download it to view.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      className="px-4 py-2 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download file</span>
+                    </button>
+                  </div>
+                )
               ) : isImageFile ? (
                 /* Simulated Rendered High-Res Image Deliverable */
                 <div
