@@ -111,8 +111,8 @@ export const AssignmentSubmit = () => {
           ? (linkDescription || `Project submission link for ${assignment.title}`)
           : (fileNotes || `Attached project deliverable: ${selectedFile.name}`),
       linkUrl: activeTab === 'link' ? linkUrl : '',
-      fileName: activeTab === 'file' ? selectedFile.name : (activeTab === 'text' ? 'Written_Submission.txt' : ''),
-      fileSize: activeTab === 'file' ? selectedFile.size : (activeTab === 'text' ? `${(textContent.length / 1024).toFixed(1)} KB` : ''),
+      fileName: activeTab === 'file' ? selectedFile.name : '',
+      fileSize: activeTab === 'file' ? selectedFile.size : '',
       fileUrl: activeTab === 'file' ? selectedFile.fileUrl : '',
     });
 
