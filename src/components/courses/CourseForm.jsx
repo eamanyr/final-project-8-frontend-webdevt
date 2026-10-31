@@ -1,27 +1,25 @@
 import React, { useState } from 'react';
 import { useLMS } from '../../context/LMSContext';
 import { ArrowLeft, Plus, Trash2, Sparkles, BookOpen, Save } from 'lucide-react';
-import { COVER_PRESETS, DEFAULT_COURSE_COVER, handleCoverError } from '../../data/coverImages';
+import { COVER_PRESETS, handleCoverError } from '../../data/coverImages';
 
 export const CourseForm = () => {
-  const { addCourse, setActiveTab, setSelectedCourseId } = useLMS();
+  const { addCourse, setActiveTab, setSelectedCourseId, currentUser, users } = useLMS();
+  const isAdmin = currentUser?.role === 'admin';
+  const teachers = (users || []).filter((u) => u.role === 'teacher' && u.status !== 'rejected' && u.status !== 'pending');
 
   const [formData, setFormData] = useState({
-    code: 'ART-205',
+    code: '',
     title: '',
-    category: 'Fine Arts',
-    level: 'Beginner level',
-    duration: '8 Weeks',
-    totalLessons: 18,
-    schedule: 'Tue & Thu • 10:00 AM - 12:00 PM',
-    room: 'Studio Hall 3A',
-    thumbnail: DEFAULT_COURSE_COVER,
+    category: '',
+    level: '',
+    duration: '',
+    schedule: '',
+    room: '',
+    instructorId: '',
+    thumbnail: '',
     description: '',
-    syllabus: [
-      { unit: 'Unit 1', title: 'Foundations & Visual Anatomy', lessons: 6 },
-      { unit: 'Unit 2', title: 'Studio Workshops & Execution', lessons: 6 },
-      { unit: 'Unit 3', title: 'Critique & Portfolio Review', lessons: 6 },
-    ],
+    syllabus: [{ unit: 'Unit 1', title: '' }],
   });
 
   const thumbnailPresets = COVER_PRESETS;
@@ -31,7 +29,7 @@ export const CourseForm = () => {
       ...formData,
       syllabus: [
         ...formData.syllabus,
-        { unit: `Unit ${formData.syllabus.length + 1}`, title: 'New Unit Study', lessons: 4 },
+        { unit: `Unit ${formData.syllabus.length + 1}`, title: '' },
       ],
     });
   };
@@ -39,17 +37,27 @@ export const CourseForm = () => {
   const handleRemoveUnit = (idx) => {
     setFormData({
       ...formData,
-      syllabus: formData.syllabus.filter((_, i) => i !== idx),
+      syllabus: formData.syllabus
+        .filter((_, i) => i !== idx)
+        .map((u, i) => ({ ...u, unit: `Unit ${i + 1}` })),
     });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.title || !formData.description) {
-      alert('Please fill out course title and description.');
+    const units = formData.syllabus.filter((u) => u.title.trim());
+    if (units.length === 0) {
+      alert('Please add at least one unit with a title.');
       return;
     }
-    const newCourse = addCourse(formData);
+    if (isAdmin && !formData.instructorId) {
+      alert('Please assign an instructor to this course.');
+      return;
+    }
+    const newCourse = addCourse({
+      ...formData,
+      syllabus: units.map((u, i) => ({ unit: `Unit ${i + 1}`, title: u.title.trim(), lessons: 0 })),
+    });
     setSelectedCourseId(newCourse.id);
     setActiveTab('course-details');
   };
@@ -118,10 +126,12 @@ export const CourseForm = () => {
                 Category
               </label>
               <select
+                required
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
               >
+                <option value="" disabled>Select a category</option>
                 <option value="Fine Arts">Fine Arts</option>
                 <option value="Illustration">Illustration</option>
                 <option value="Typography">Typography</option>
@@ -135,10 +145,12 @@ export const CourseForm = () => {
                 Level
               </label>
               <select
+                required
                 value={formData.level}
                 onChange={(e) => setFormData({ ...formData, level: e.target.value })}
                 className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
               >
+                <option value="" disabled>Select a level</option>
                 <option value="Beginner level">Beginner level</option>
                 <option value="Intermediate level">Intermediate level</option>
                 <option value="Advanced level">Advanced level</option>
@@ -151,6 +163,7 @@ export const CourseForm = () => {
               </label>
               <input
                 type="text"
+                required
                 value={formData.duration}
                 onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
                 placeholder="e.g. 10 Weeks"
@@ -158,6 +171,25 @@ export const CourseForm = () => {
               />
             </div>
           </div>
+
+          {isAdmin && (
+            <div>
+              <label className="block text-xs font-bold text-charcoal uppercase tracking-wider mb-1">
+                Assigned Instructor
+              </label>
+              <select
+                required
+                value={formData.instructorId}
+                onChange={(e) => setFormData({ ...formData, instructorId: e.target.value })}
+                className="w-full bg-cream/40 border border-charcoal/15 rounded-xl px-3 py-2 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-forest/30"
+              >
+                <option value="" disabled>Select an instructor</option>
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Description */}
           <div>
@@ -182,6 +214,7 @@ export const CourseForm = () => {
               </label>
               <input
                 type="text"
+                required
                 value={formData.schedule}
                 onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
                 placeholder="e.g. Mon & Wed • 10:00 AM - 12:00 PM"
@@ -195,6 +228,7 @@ export const CourseForm = () => {
               </label>
               <input
                 type="text"
+                required
                 value={formData.room}
                 onChange={(e) => setFormData({ ...formData, room: e.target.value })}
                 placeholder="e.g. Digital Lab 304 or Studio Hall 2"
@@ -266,22 +300,10 @@ export const CourseForm = () => {
                       updated[idx].title = e.target.value;
                       setFormData({ ...formData, syllabus: updated });
                     }}
+                    required
                     placeholder="Unit topic title"
                     className="flex-1 bg-white border border-charcoal/10 rounded-lg px-2.5 py-1 text-xs text-charcoal focus:outline-none"
                   />
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={unit.lessons}
-                    onChange={(e) => {
-                      const updated = [...formData.syllabus];
-                      updated[idx].lessons = parseInt(e.target.value) || 1;
-                      setFormData({ ...formData, syllabus: updated });
-                    }}
-                    className="w-16 bg-white border border-charcoal/10 rounded-lg px-2 py-1 text-xs text-charcoal text-center"
-                  />
-                  <span className="text-[11px] text-charcoal-muted">Lessons</span>
                   {formData.syllabus.length > 1 && (
                     <button
                       type="button"

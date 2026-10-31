@@ -806,7 +806,9 @@ const COURSE_UNIT_LESSONS = {
 };
 
 export const getDefaultUnitLessons = (course, unitIdx) => {
-  if (!course) return [];
+  // Courses without bundled lesson content (i.e. ones a teacher created) start empty:
+  // the teacher adds the lessons themselves.
+  if (!course || !COURSE_UNIT_LESSONS[course.id]) return [];
   const syllabus = course.syllabus?.length
     ? course.syllabus
     : [{ unit: 'Unit 1', title: 'Core Studio Foundations', lessons: 3 }];
