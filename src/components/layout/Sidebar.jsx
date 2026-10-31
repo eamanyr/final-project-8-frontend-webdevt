@@ -44,8 +44,7 @@ export const Sidebar = () => {
     role === 'student'
       ? assignments.filter((asg) => {
           const inEnrolledCourse =
-            !currentUser.enrolledCourseIds?.length ||
-            currentUser.enrolledCourseIds.includes(asg.courseId);
+            currentUser.enrolledCourseIds?.includes(asg.courseId);
           const alreadySubmitted = submissions.some(
             (s) => s.assignmentId === asg.id && s.studentId === currentUser.id
           );
