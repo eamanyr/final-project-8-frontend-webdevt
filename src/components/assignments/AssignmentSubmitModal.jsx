@@ -16,6 +16,9 @@ import {
   Trash2
 } from 'lucide-react';
 
+// Files are sent to the API as base64 inside a 10 MB JSON body, so keep the raw file under ~7 MB.
+const MAX_UPLOAD_BYTES = 7 * 1024 * 1024;
+
 export const AssignmentSubmitModal = ({ assignment, onClose, onSubmitted }) => {
   const { currentUser, submitAssignment, assignmentOrigin, setActiveTab } = useLMS();
 
@@ -29,12 +32,7 @@ export const AssignmentSubmitModal = ({ assignment, onClose, onSubmitted }) => {
   const [linkUrl, setLinkUrl] = useState('');
   const [linkDescription, setLinkDescription] = useState('');
 
-  const [selectedFile, setSelectedFile] = useState({
-    name: `${currentUser?.name ? currentUser.name.replace(/\s+/g, '_') : 'Student'}_Final_Work.pdf`,
-    size: '4.2 MB',
-    fileUrl: '',
-    rawFile: null,
-  });
+  const [selectedFile, setSelectedFile] = useState(null);
   const [fileNotes, setFileNotes] = useState('');
 
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -44,17 +42,25 @@ export const AssignmentSubmitModal = ({ assignment, onClose, onSubmitted }) => {
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setErrorMessage('This file is too large. Please upload a file of 7 MB or less.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
       const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-      const previewUrl = URL.createObjectURL(file);
       setSelectedFile({
         name: file.name,
         size: `${sizeMB} MB`,
-        fileUrl: previewUrl,
+        fileUrl: reader.result,
         rawFile: file,
       });
       setErrorMessage('');
-    }
+    };
+    reader.onerror = () => setErrorMessage('Could not read that file. Please try again.');
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = (e) => {
@@ -355,7 +361,7 @@ export const AssignmentSubmitModal = ({ assignment, onClose, onSubmitted }) => {
                         Click to browse or drag &amp; drop your deliverable file
                       </p>
                       <p className="text-[11px] text-charcoal-muted mt-1">
-                        Accepts PDF, Images (PNG, JPG), Word (DOCX), or Archives (ZIP) up to 50 MB
+                        Accepts PDF, Images (PNG, JPG), Word (DOCX), or Archives (ZIP) up to 7 MB
                       </p>
                     </label>
 
