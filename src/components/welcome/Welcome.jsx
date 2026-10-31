@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Sparkles,
@@ -11,24 +11,16 @@ import {
   Bell,
   ShieldCheck,
   ChevronDown,
-  Mail,
-  ExternalLink,
+  Menu,
+  X,
 } from 'lucide-react';
 import { ThemeToggle } from '../common/ThemeToggle';
-
-/* ---------- Fill these in for the Contact section ---------- */
-// Leave a value as '' to hide that button.
-const CONTACT = {
-  email: '', // e.g. 'yourgroup@gmail.com'
-  github: '', // e.g. 'https://github.com/name-of-the-group/project-name'
-};
 
 const NAV_LINKS = [
   { href: '#about', label: 'About Us' },
   { href: '#features', label: 'Features' },
   { href: '#how-it-works', label: 'How It Works' },
   { href: '#faq', label: 'FAQ' },
-  { href: '#contact', label: 'Contact' },
 ];
 
 const FEATURES = [
@@ -122,6 +114,8 @@ const SectionHeading = ({ title, text }) => (
 );
 
 export const Welcome = () => {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-cream text-charcoal font-body">
       {/* Top bar */}
@@ -137,6 +131,7 @@ export const Welcome = () => {
           </Link>
 
           <nav className="flex items-center gap-2 sm:gap-3">
+            {/* Wide screens: links in the bar */}
             <div className="hidden lg:flex items-center">
               {NAV_LINKS.map(({ href, label }) => (
                 <a
@@ -148,9 +143,41 @@ export const Welcome = () => {
                 </a>
               ))}
             </div>
+
             <ThemeToggle />
+
+            {/* Small screens: menu button */}
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
+              className="lg:hidden inline-flex items-center justify-center w-9 h-9 rounded-full border border-charcoal/10 bg-white text-charcoal hover:bg-sage/15 transition-colors shadow-xs"
+            >
+              {menuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
           </nav>
         </div>
+
+        {/* Small screens: dropdown with the same links */}
+        {menuOpen && (
+          <div id="mobile-menu" className="lg:hidden border-t border-charcoal/10 bg-cream">
+            <ul className="max-w-6xl mx-auto px-5 sm:px-8 py-2">
+              {NAV_LINKS.map(({ href, label }) => (
+                <li key={href}>
+                  <a
+                    href={href}
+                    onClick={() => setMenuOpen(false)}
+                    className="block py-3 text-sm font-bold text-charcoal-muted hover:text-charcoal border-b border-charcoal/5"
+                  >
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </header>
 
       {/* Hero */}
@@ -285,50 +312,7 @@ export const Welcome = () => {
         </div>
       </section>
 
-      {/* Contact */}
-      <section id="contact" className="scroll-mt-20 bg-white border-t border-charcoal/10">
-        <div className="max-w-3xl mx-auto px-5 sm:px-8 py-16 sm:py-20 text-center">
-          <SectionHeading
-            title="Contact Us"
-            text="Have a question about CacheUp? Get in touch with the team behind it."
-          />
-
-          {(CONTACT.email || CONTACT.github) && (
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              {CONTACT.email && (
-                <a
-                  href={`mailto:${CONTACT.email}`}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-forest text-cream text-xs font-bold hover:bg-forest-light transition-colors"
-                >
-                  <Mail className="w-4 h-4" aria-hidden="true" />
-                  <span>{CONTACT.email}</span>
-                </a>
-              )}
-              {CONTACT.github && (
-                <a
-                  href={CONTACT.github}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-charcoal/20 text-xs font-bold text-charcoal hover:bg-charcoal/5 transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" aria-hidden="true" />
-                  <span>View the project</span>
-                </a>
-              )}
-            </div>
-          )}
-
-          <p className="mt-8 text-xs sm:text-sm text-charcoal-muted">
-            Already have an account? Use the Help center in the sidebar after you log in.
-          </p>
-          <p className="mt-4 text-xs sm:text-sm text-charcoal-muted">
-            Built by Group 8, Section C3A: Ryna Mae Obcemane, Clyde Yuan Pesigan, and Stefanie
-            Mariah Suyo.
-          </p>
-        </div>
-      </section>
-
-      <footer className="px-5 sm:px-8 py-8 text-center text-xs text-charcoal-muted">
+      <footer className="border-t border-charcoal/10 px-5 sm:px-8 py-8 text-center text-xs text-charcoal-muted">
         CacheUp • Learn • Grow
       </footer>
     </div>
