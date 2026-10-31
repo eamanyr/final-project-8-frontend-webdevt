@@ -8,7 +8,6 @@ import {
   Users,
   FileText,
   Clock,
-  Star,
   BookOpen,
   Calendar,
   CheckCircle,
@@ -819,10 +818,6 @@ export const CourseDetails = () => {
             </span>
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-forest text-cream shadow-sm">
               {course.category}
-            </span>
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-gold text-charcoal shadow-sm inline-flex items-center gap-1">
-              <Star className="w-3.5 h-3.5 fill-charcoal text-charcoal" />
-              <span>{course.rating}</span>
             </span>
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/90 text-charcoal backdrop-blur-xs shadow-sm inline-flex items-center gap-1">
               <BookOpen className="w-3.5 h-3.5 text-forest" />

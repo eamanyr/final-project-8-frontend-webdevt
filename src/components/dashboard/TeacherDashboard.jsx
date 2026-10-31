@@ -6,7 +6,6 @@ import {
   BookOpen,
   Users,
   ClipboardCheck,
-  Star,
   PlusCircle,
   FileCheck2,
   FolderPlus,
@@ -96,7 +95,7 @@ export const TeacherDashboard = () => {
       </div>
 
       {/* Teacher Key Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
           title="Active Courses"
           value={myCourses.length}
@@ -123,15 +122,6 @@ export const TeacherDashboard = () => {
           trendPositive={pendingSubmissions.length === 0}
           colorScheme="gold"
           onClick={() => setActiveTab('submissions')}
-        />
-        <StatCard
-          title="Instructor Rating"
-          value="4.95"
-          subtitle="Based on 112 student reviews"
-          icon={Star}
-          trend="Top Tier"
-          trendPositive={true}
-          colorScheme="charcoal"
         />
       </div>
 

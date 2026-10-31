@@ -201,10 +201,6 @@ export const MyProgress = () => {
                 <span className="font-bold text-charcoal">{enrolledCourses.length}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-charcoal/5">
-                <span className="text-charcoal-muted">Academy Honor Points</span>
-                <span className="font-bold text-forest">{currentUser?.points} pts</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-charcoal/5">
                 <span className="text-charcoal-muted">Accreditation Status</span>
                 <span className="font-bold text-emerald-700">Good Standing (2026)</span>
               </div>

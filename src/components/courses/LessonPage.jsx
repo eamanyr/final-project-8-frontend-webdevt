@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useLMS } from '../../context/LMSContext';
 import { buildCourseUnitsWithItems } from '../../data/courseCurriculum';
 import {
@@ -10,7 +10,6 @@ import {
   Sparkles,
   ClipboardCheck,
   ArrowDown,
-  Star,
   Award,
   MessageSquare,
   Edit3,
@@ -38,8 +37,6 @@ export const LessonPage = () => {
     setActiveTab,
     setSelectedAssignmentId,
     setAssignmentOrigin,
-    courseRatings,
-    rateCourse,
     markCourseComplete,
     addToast,
   } = useLMS();
@@ -132,68 +129,11 @@ export const LessonPage = () => {
       ? units[currentUnit.unitIdx + 1]?.lessons?.[0] || null
       : null;
 
-  // Course completion & rating parameters
+  // Course completion parameters
   const isLastLesson = globalLessonIdx === allLessons.length - 1;
   const isCourseCompleted =
     course.progress === 100 || course.completedLessons >= course.totalLessons;
-  const shouldShowRating = isLastLesson || isCourseCompleted;
-
-  const courseReviews = courseRatings?.[course.id] || [];
-  const userExistingReview = courseReviews.find(
-    (r) => r.studentId === currentUser?.id
-  );
-
-  const [ratingScore, setRatingScore] = useState(5);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [selectedTags, setSelectedTags] = useState([]);
-  const [reviewText, setReviewText] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [showCommunityReviews, setShowCommunityReviews] = useState(false);
-
-  useEffect(() => {
-    if (userExistingReview) {
-      setRatingScore(userExistingReview.rating || 5);
-      setSelectedTags(userExistingReview.tags || []);
-      setReviewText(userExistingReview.review || '');
-    } else {
-      setRatingScore(5);
-      setSelectedTags([]);
-      setReviewText('');
-    }
-  }, [userExistingReview?.id, course.id]);
-
-  const RATING_TAG_OPTIONS = [
-    'Inspiring Instructor',
-    'Clear & Structured Syllabus',
-    'Practical Studio Exercises',
-    'Constructive Critique',
-    'Portfolio-Ready Outcomes',
-    'Challenging & Rewarding',
-  ];
-
-  const STAR_DESCRIPTIONS = {
-    1: '⭐ 1.0 — Needs Improvement',
-    2: '⭐⭐ 2.0 — Fair / Average',
-    3: '⭐⭐⭐ 3.0 — Good Studio Experience',
-    4: '⭐⭐⭐⭐ 4.0 — Very Good & Informative',
-    5: '⭐⭐⭐⭐⭐ 5.0 — Exceptional Masterclass!',
-  };
-
-  const handleToggleTag = (tag) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  };
-
-  const handleSubmitRating = (e) => {
-    e.preventDefault();
-    rateCourse(course.id, {
-      rating: ratingScore,
-      review: reviewText,
-      tags: selectedTags,
-    });
-    setIsEditing(false);
-  };
+  const shouldShowCompletion = !isTeacher && (isLastLesson || isCourseCompleted);
 
   const handleGoToLesson = (lesson) => {
     if (!lesson) return;
@@ -402,14 +342,14 @@ export const LessonPage = () => {
           </div>
         </div>
 
-        {/* Course Completion & Rating Section (Rendered in the last part of the lessons when course is completed or on the final lesson) */}
-        {shouldShowRating && (
+        {/* Course Completion Section (Rendered in the last part of the lessons when course is completed or on the final lesson) */}
+        {shouldShowCompletion && (
           <div className="pt-6 border-t border-charcoal/10">
             <div className="bg-gradient-to-br from-cream/40 via-white to-cream/70 rounded-3xl p-6 sm:p-7 border border-charcoal/10 shadow-xs relative overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-gold/10 rounded-full blur-3xl pointer-events-none" />
 
               {/* Header Banner */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold to-gold-dark text-charcoal flex items-center justify-center shadow-xs shrink-0">
                     <Award className="w-6 h-6 text-charcoal stroke-[2.2]" />
@@ -424,7 +364,7 @@ export const LessonPage = () => {
                       </span>
                     </div>
                     <h3 className="text-base sm:text-lg font-black font-heading text-charcoal mt-0.5">
-                      Course Evaluation &amp; Rating
+                      Course Completion
                     </h3>
                   </div>
                 </div>
@@ -440,285 +380,6 @@ export const LessonPage = () => {
                   </button>
                 )}
               </div>
-
-              {/* Content depending on role and rating state */}
-              {isTeacher ? (
-                /* Faculty Overview */
-                <div className="bg-white/85 rounded-2xl p-5 border border-charcoal/10 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-charcoal-muted">
-                        Faculty Overview
-                      </span>
-                      <h4 className="text-sm font-bold text-charcoal">
-                        Student Reviews &amp; Evaluations
-                      </h4>
-                    </div>
-                    <div className="flex items-center gap-2 bg-cream px-3 py-1.5 rounded-xl border border-charcoal/10 self-start sm:self-auto">
-                      <Star className="w-4 h-4 text-gold fill-gold" />
-                      <span className="text-xs font-bold text-charcoal">
-                        {course.rating} / 5.0
-                      </span>
-                      <span className="text-[11px] text-charcoal-muted">
-                        ({courseReviews.length} reviews)
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-charcoal-muted">
-                    Below are studio critiques and ratings submitted by enrolled students for {course.title}.
-                  </p>
-                </div>
-              ) : userExistingReview && !isEditing ? (
-                /* Already Reviewed by Current Student */
-                <div className="bg-white rounded-2xl p-5 border border-forest/20 shadow-2xs space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-forest flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-forest" />
-                        You have reviewed this course
-                      </span>
-                      <span className="text-[11px] text-charcoal-muted">
-                        • {userExistingReview.date}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(true)}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-forest hover:underline cursor-pointer self-start sm:self-auto"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span>Edit Your Review</span>
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-5 h-5 ${
-                            star <= userExistingReview.rating
-                              ? 'text-gold fill-gold'
-                              : 'text-charcoal/15'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-xs font-bold text-charcoal">
-                      {userExistingReview.rating}.0 / 5.0
-                    </span>
-                  </div>
-
-                  {userExistingReview.tags?.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {userExistingReview.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-2.5 py-0.5 rounded-full bg-forest-50 text-forest text-[11px] font-bold border border-forest/20"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {userExistingReview.review && (
-                    <blockquote className="text-xs sm:text-sm text-charcoal bg-cream/40 p-3.5 rounded-xl border border-charcoal/10 italic">
-                      "{userExistingReview.review}"
-                    </blockquote>
-                  )}
-                </div>
-              ) : (
-                /* Interactive Rating Form */
-                <form
-                  onSubmit={handleSubmitRating}
-                  className="bg-white rounded-2xl p-5 sm:p-6 border border-charcoal/10 shadow-2xs space-y-4"
-                >
-                  {/* Star Rating Picker */}
-                  <div>
-                    <label className="block text-xs font-bold text-charcoal mb-2">
-                      Your Rating (1 to 5 Stars):
-                    </label>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <div
-                        className="flex items-center gap-1.5"
-                        onMouseLeave={() => setHoverRating(0)}
-                      >
-                        {[1, 2, 3, 4, 5].map((star) => {
-                          const isFilled =
-                            (hoverRating || ratingScore) >= star;
-                          return (
-                            <button
-                              key={star}
-                              type="button"
-                              onClick={() => setRatingScore(star)}
-                              onMouseEnter={() => setHoverRating(star)}
-                              className="p-1 hover:scale-115 transition-transform cursor-pointer focus:outline-none"
-                              aria-label={`Rate ${star} star`}
-                            >
-                              <Star
-                                className={`w-7 h-7 transition-colors ${
-                                  isFilled
-                                    ? 'text-gold fill-gold drop-shadow-xs'
-                                    : 'text-charcoal/20 fill-charcoal/5'
-                                }`}
-                              />
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <span className="text-xs font-bold text-forest bg-forest-50 px-3 py-1 rounded-xl border border-forest/15 self-start">
-                        {STAR_DESCRIPTIONS[hoverRating || ratingScore]}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Feedback Tags */}
-                  <div>
-                    <label className="block text-xs font-bold text-charcoal mb-2">
-                      What made this course stand out? (Select tags)
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {RATING_TAG_OPTIONS.map((tag) => {
-                        const isSelected = selectedTags.includes(tag);
-                        return (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => handleToggleTag(tag)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                              isSelected
-                                ? 'bg-forest text-cream border-forest shadow-2xs'
-                                : 'bg-cream/40 text-charcoal-muted border-charcoal/15 hover:border-forest/40 hover:text-charcoal'
-                            }`}
-                          >
-                            {tag}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Review Textarea */}
-                  <div>
-                    <label className="block text-xs font-bold text-charcoal mb-1.5">
-                      Written Review / Studio Feedback (Optional):
-                    </label>
-                    <textarea
-                      value={reviewText}
-                      onChange={(e) => setReviewText(e.target.value)}
-                      rows={3}
-                      placeholder="Share your experience with the curriculum, weekly critiques, and studio assignments..."
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal/20 bg-cream/30 text-xs sm:text-sm text-charcoal placeholder:text-charcoal-muted/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-forest/20"
-                    />
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="flex items-center gap-3 pt-1">
-                    <button
-                      type="submit"
-                      className="px-6 py-2.5 rounded-xl bg-forest text-cream hover:bg-forest-light text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4 text-gold" />
-                      <span>
-                        {userExistingReview ? 'Update Your Rating' : 'Submit Course Rating (+50 XP)'}
-                      </span>
-                    </button>
-                    {isEditing && (
-                      <button
-                        type="button"
-                        onClick={() => setIsEditing(false)}
-                        className="px-4 py-2.5 rounded-xl border border-charcoal/20 text-xs font-bold text-charcoal hover:bg-cream transition-colors cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </div>
-                </form>
-              )}
-
-              {/* Community Reviews Collapsible Drawer */}
-              {courseReviews.length > 0 && (
-                <div className="mt-5 pt-4 border-t border-charcoal/10">
-                  <button
-                    type="button"
-                    onClick={() => setShowCommunityReviews((prev) => !prev)}
-                    className="w-full flex items-center justify-between text-left text-xs font-bold text-charcoal hover:text-forest transition-colors cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-forest" />
-                      <span>
-                        Community Ratings &amp; Peer Reviews ({courseReviews.length})
-                      </span>
-                    </span>
-                    {showCommunityReviews ? (
-                      <ChevronUp className="w-4 h-4 text-charcoal-muted" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-charcoal-muted" />
-                    )}
-                  </button>
-
-                  {showCommunityReviews && (
-                    <div className="mt-3.5 space-y-3">
-                      {courseReviews.map((rev) => (
-                        <div
-                          key={rev.id}
-                          className="bg-white p-4 rounded-2xl border border-charcoal/10 shadow-2xs space-y-2"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2.5">
-                              <img
-                                src={rev.studentAvatar}
-                                alt=""
-                                className="w-7 h-7 rounded-full object-cover border border-charcoal/10"
-                              />
-                              <div>
-                                <h5 className="text-xs font-bold text-charcoal">
-                                  {rev.studentName}
-                                </h5>
-                                <span className="text-[10px] text-charcoal-muted">
-                                  {rev.date}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {[1, 2, 3, 4, 5].map((s) => (
-                                <Star
-                                  key={s}
-                                  className={`w-3.5 h-3.5 ${
-                                    s <= rev.rating
-                                      ? 'text-gold fill-gold'
-                                      : 'text-charcoal/15'
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                          </div>
-
-                          {rev.tags?.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {rev.tags.map((t) => (
-                                <span
-                                  key={t}
-                                  className="px-2 py-0.5 rounded-full bg-cream text-[10px] font-bold text-charcoal border border-charcoal/10"
-                                >
-                                  {t}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {rev.review && (
-                            <p className="text-xs text-charcoal-muted leading-relaxed">
-                              "{rev.review}"
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         )}
