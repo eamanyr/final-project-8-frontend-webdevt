@@ -697,7 +697,7 @@ const SubmissionCard = ({ submission, onGrade, addToast }) => {
 
             {/* Attached Deliverables & External Links */}
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {submission.fileName && (
+              {submission.fileName && submission.submissionType !== 'text' && (
                 <button
                   type="button"
                   onClick={onGrade}
